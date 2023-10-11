@@ -5,13 +5,28 @@
             "label": "C/C++: cl.exe käännä ohjelma",
             "command": "cl.exe",
             "args": [
-                "/O2",
+                "/permissive-",
+                "/Qvec-report:1",
                 "/W4",
                 "/std:c++17",
-                "/EHsc",
+                "/EHsc", // enable exceptions?
                 "/nologo",
                 "/Fe${workspaceFolder}\\built\\a.exe",
-                "${workspaceFolder}\\*.cpp"
+                "${workspaceFolder}\\*.cpp",
+                // "/favor:INTEL64",
+                "/arch:AVX2",
+                "/GR-", // disable C++ RTTI
+                //"/O1",  // optimize for size
+                "/O2",  // optimize for speed
+                "/GL",  // "Whole program optimization"
+                "/Gw",  // Optimize Global Data
+                "/MT",  // link with LIBCMT.LIB
+                //"/DNDEBUG", // #define NDEBUG, ks. c_cpp_properties.json
+                // "/MTd", //MTd link with LIBCMTD.LIB debug lib
+                // "/Zi",  //enable debug
+                "/link",
+                // "/DEBUG",
+                "/LTCG", // Link-time code generation /GL'n kanssa
             ],
             "options": {
                 "cwd": "${workspaceFolder}\\built"
