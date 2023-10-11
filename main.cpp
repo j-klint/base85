@@ -24,6 +24,17 @@ int main(int argc, char** argv)
 	std::istream& instream{ argc == 2 ? infile : std::cin };
 	size_t wrap { 75 }, charsOnThisLine{ 0 };
 
+	auto OutputCharacter = [wrap, &charsOnThisLine](char c)
+	{
+		if ( (wrap != 0) && (charsOnThisLine == wrap) )
+		{
+			std::cout << '\n';
+			charsOnThisLine = 0;
+		}
+		std::cout << c;
+		++charsOnThisLine;
+	};
+
 	while ( instream.good() )
 	{
 		char buffer[4]{0,0,0,0};
@@ -36,15 +47,13 @@ int main(int argc, char** argv)
 
 			if ( word == 0 )
 			{
-				std::cout << 'z';
-				++charsOnThisLine;
+				OutputCharacter('z');
 				continue;
 			}
 
 			if ( word == 0x20202020 )
 			{
-				std::cout << 'y';
-				++charsOnThisLine;
+				OutputCharacter('y');
 				continue;
 			}
 
@@ -58,15 +67,7 @@ int main(int argc, char** argv)
 
 			size_t writeThisMany = bytesRead + 1;
 			for ( size_t j = 0; j < writeThisMany; ++j )
-			{
-				if ( (wrap != 0) && (charsOnThisLine == wrap) )
-				{
-					std::cout << '\n';
-					charsOnThisLine = 0;
-				}
-				std::cout << output[j];
-				++charsOnThisLine;
-			}
+				OutputCharacter(output[j]);
 		}
 	}
 
