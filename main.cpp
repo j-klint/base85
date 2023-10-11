@@ -4,9 +4,9 @@
 int main(int argc, char** argv)
 {
 	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
-	constexpr uint32_t alphaSize{85};
+	constexpr uint32_t alphabetSize{85};
 	std::ifstream infile;
-	
+
 	if ( argc == 2 )
 	{
 		infile.open(argv[1], std::ios::binary);
@@ -22,7 +22,8 @@ int main(int argc, char** argv)
 	// }
 
 	std::istream& instream{ argc == 2 ? infile : std::cin };
-	
+	size_t wrap { 75 }, charsOnThisLine{ 0 };
+
 	while ( instream.good() )
 	{
 		char buffer[4]{0,0,0,0};
@@ -32,18 +33,38 @@ int main(int argc, char** argv)
 		if ( bytesRead > 0 )
 		{
 			uint32_t word = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
-			char output[5];
 
-			output[4] = 33 + word % alphaSize;
-			for ( int j = 3; j >= 0; --j )
+			if ( word == 0 )
 			{
-				word /= alphaSize;
-				output[j] = 33 + word % alphaSize;
+				std::cout << 'z';
+				continue;
 			}
 
-			++bytesRead;
-			for ( size_t j = 0; j < bytesRead; ++j )
+			if ( word == 0x20202020 )
+			{
+				std::cout << 'y';
+				continue;
+			}
+
+			char output[5];
+			output[4] = 33 + word % alphabetSize;
+			for ( int j = 3; j >= 0; --j )
+			{
+				word /= alphabetSize;
+				output[j] = 33 + word % alphabetSize;
+			}
+
+			size_t writeThisMany = bytesRead + 1;
+			for ( size_t j = 0; j < writeThisMany; ++j )
+			{
+				if ( (wrap != 0) && (charsOnThisLine == wrap) )
+				{
+					std::cout << '\n';
+					charsOnThisLine = 0;
+				}
 				std::cout << output[j];
+				++charsOnThisLine;
+			}
 		}
 	}
 
