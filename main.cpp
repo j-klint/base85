@@ -37,12 +37,14 @@ int main(int argc, char** argv)
 			if ( word == 0 )
 			{
 				std::cout << 'z';
+				++charsOnThisLine;
 				continue;
 			}
 
 			if ( word == 0x20202020 )
 			{
 				std::cout << 'y';
+				++charsOnThisLine;
 				continue;
 			}
 
