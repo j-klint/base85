@@ -10,50 +10,49 @@ const std::string Alphabet{ "1qM,2wN;3eB.4rV:5tC_6yX/7uZ*8iL-9oK+0pJ!1aH@2sG#3dF
 
 int main(int argc, char** argv)
 {
-	if ( argc < 2 )
-	{
-		std::cout << "Ei argumenttia.\n";
-		return 1;
-	}
-
 	constexpr uint32_t alphaSize{85};
-	//const uint32_t alphaSize = static_cast<uint32_t>(Alphabet.size());
-	// while ( log < UINT32_MAX )
-	// 	log *= Alphabet.size();
-
-	std::ifstream infile(argv[1], std::ios::binary);
-	infile.seekg(0, std::ios::end);
-	size_t inputSize = infile.tellg();
-	infile.seekg(0, std::ios::beg);
-	const size_t bufsize{ ((inputSize + 3u) / 4u) * 4u };
-	std::unique_ptr<char[]> buffer(new char[bufsize]);
-	infile.read(buffer.get(), inputSize);
-	infile.close();
-
-	const size_t padding{ bufsize - inputSize };
-	for (size_t i = inputSize; i < bufsize; ++i)
-	{
-		buffer[i] = 0;
-	}
-
-	for (size_t i = 0; i < bufsize; i += 4)
-	{
-		uint32_t word = (buffer[i] << 24) | (buffer[i+1] << 16) | (buffer[i+2] << 8) | (buffer[i+3]);
-		//char output[5]{ 33, 33, 33, 33, static_cast<char>(33 + word % alphaSize) };
-		char output[5];
-
-		output[4] = Alphabet[word % alphaSize];
-		for ( int j = 3; j >= 0; --j )
-		{
-			word /= alphaSize;
-			output[j] = Alphabet[word % alphaSize];
-		}
-
-		size_t limit{ i < (bufsize - 4) ? 5 : 5 - padding };
-		for ( size_t j = 0; j < limit; ++j )
-			std::cout << output[j];
-	}
+	std::ifstream infile;
 	
-	std::cout << "\n";
+	if ( argc == 2 )
+	{
+		infile.open(argv[1], std::ios::binary);
+		if ( !infile.good() )
+		{
+			std::cerr << "Unable to open input file.\n";
+			return 1;
+		}
+	}
+	else
+	{
+		//std::cerr << "No input file specified. Reading from std::cin.\n";
+	}
+
+	std::istream& instream{ argc == 2 ? infile : std::cin };
+	
+	while ( instream.good() )
+	{
+		char buffer[4]{0,0,0,0};
+		instream.read(buffer, 4);
+		size_t bytesRead = instream.gcount();
+
+		if ( bytesRead > 0 )
+		{
+			uint32_t word = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
+			char output[5];
+
+			output[4] = Alphabet[word % alphaSize];
+			for ( int j = 3; j >= 0; --j )
+			{
+				word /= alphaSize;
+				output[j] = Alphabet[word % alphaSize];
+			}
+
+			const size_t limit{ bytesRead + 1 };
+			for ( size_t j = 0; j < limit; ++j )
+				std::cout << output[j];
+		}
+	}
+
+	//std::cout << "\n";
 	return 0;
 }
