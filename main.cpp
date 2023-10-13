@@ -27,13 +27,14 @@ struct BinaryMode
 struct Parameters
 {
 	char* inputFile{ nullptr };
+	char* outputFile{ nullptr };
 	int wrap{ 75 };
 	bool decode{ false };
 };
 
 static constexpr uint32_t alphabetSize{ 85 };
-int Encode(std::istream& instream, size_t wrap);
-int Decode(std::istream& instream);
+int Encode(std::istream& instream, size_t wrap, std::ostream& outstream);
+int Decode(std::istream& instream, std::ostream& outstream);
 Parameters ParseArgs(int argc, char** argv);
 
 int main(int argc, char** argv) try
@@ -44,6 +45,7 @@ int main(int argc, char** argv) try
 	
 	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
 	std::ifstream infile;
+	std::ofstream outfile;
 	Parameters args = ParseArgs(argc, argv);
 
 	if ( args.inputFile )
@@ -56,12 +58,27 @@ int main(int argc, char** argv) try
 		}
 	}
 
+	if ( args.outputFile )
+	{
+		// if ( args.decode )
+			outfile.open(args.outputFile, std::ios::binary);
+		// else
+		// 	outfile.open(args.outputFile,std::ios_base::out);
+
+		if ( !outfile.good() )
+		{
+			std::cerr << "Unable to open output file.";
+			return 1;
+		}
+	}
+
 	std::istream& instream{ args.inputFile ? infile : std::cin };
+	std::ostream& outstream{ args.outputFile ? outfile : std::cout };
 
 	if ( args.decode )
-		return Decode(instream);
+		return Decode(instream, outstream);
 	else
-		return Encode(instream, args.wrap);
+		return Encode(instream, args.wrap, outstream);
 }
 catch ( std::string& v )
 {
@@ -110,6 +127,10 @@ Parameters ParseArgs(int argc, char** argv)
 		{
 			throw (std::string{ "Unknown switch \"" } + input + "\".");
 		}
+		else if ( retval.inputFile )
+		{
+			retval.outputFile = argv[i];
+		}
 		else
 		{
 			retval.inputFile = argv[i];
@@ -119,18 +140,18 @@ Parameters ParseArgs(int argc, char** argv)
 	return retval;
 }
 
-int Encode(std::istream& instream, size_t wrap)
+int Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 {
 	size_t charsOnThisLine{ 0 };
 
-	auto OutputCharacter = [wrap, &charsOnThisLine](char c)
+	auto WrappedPrint = [wrap, &charsOnThisLine, &outstream](char c)
 	{
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
-			std::cout << '\n';
+			outstream << '\n';
 			charsOnThisLine = 0;
 		}
-		std::cout << c;
+		outstream << c;
 		++charsOnThisLine;
 	};
 
@@ -146,13 +167,13 @@ int Encode(std::istream& instream, size_t wrap)
 
 			if ( word == 0 )
 			{
-				OutputCharacter('z');
+				WrappedPrint('z');
 				continue;
 			}
 
 			if ( word == 0x20202020 )
 			{
-				OutputCharacter('y');
+				WrappedPrint('y');
 				continue;
 			}
 
@@ -166,16 +187,17 @@ int Encode(std::istream& instream, size_t wrap)
 
 			size_t writeThisMany = bytesRead + 1;
 			for ( size_t j = 0; j < writeThisMany; ++j )
-				OutputCharacter(output[j]);
+				WrappedPrint(output[j]);
 		}
 	}
 
-	std::cout.flush();
+	//std::cout.flush();
+	outstream.flush();
 	return 0;
 }
 
 
-char* DecodeXY(char* start, const char* const end)
+char* DecodeZY(char* start, const char* const end, std::ostream& outstream)
 {
 	static constexpr char zeros[4]{0,0,0,0};
 	static constexpr char spaces[4]{0x20,0x20,0x20,0x20};
@@ -185,15 +207,15 @@ char* DecodeXY(char* start, const char* const end)
 	{
 		again = 0;
 
-		if ( *start == 'x' )
+		if ( *start == 'z' )
 		{
-			//std::cout.write(zeros, 4); // hah hah. ei toimi.
+			outstream.write(zeros, 4);
 			++start;
 			again = 1;
 		}
 		else if ( *start == 'y' )
 		{
-			std::cout.write(spaces, 4);
+			outstream.write(spaces, 4);
 			++start;
 			again = 1;
 		}
@@ -202,14 +224,14 @@ char* DecodeXY(char* start, const char* const end)
 	return start;
 }
 
-char* Decode5(char* buf, size_t amount = 4)
+char* Decode5(char* buf, std::ostream& outstream, size_t amount = 4)
 {
 	uint64_t word{ 0 };
-	uint64_t powers[5]{ alphabetSize*alphabetSize*alphabetSize*alphabetSize,
-	                    alphabetSize*alphabetSize*alphabetSize,
-	                    alphabetSize*alphabetSize,
-	                    alphabetSize,
-	                    1 };
+	static constexpr uint64_t powers[5]{ alphabetSize*alphabetSize*alphabetSize*alphabetSize,
+	                                     alphabetSize*alphabetSize*alphabetSize,
+	                                     alphabetSize*alphabetSize,
+	                                     alphabetSize,
+	                                     1 };
 	
 	for (size_t i = 0; i < 5; ++i)
 	{
@@ -219,13 +241,13 @@ char* Decode5(char* buf, size_t amount = 4)
 
 		word += powers[i] * (c - 33);
 	}
-	
+	constexpr char gg{ -50 };
 	if ( word > UINT32_MAX )
 		throw std::string{ "Decoding error: Over-big group." };
 
 	for ( size_t i = 0; i < amount; ++i )
 	{
-		std::cout.put(char(0xff & (word >> 24)));
+		outstream.put(char(0xff & (word >> 24)));
 		word <<= 8;
 	}
 
@@ -234,14 +256,14 @@ char* Decode5(char* buf, size_t amount = 4)
 
 char* DiscardInvalids(char* start, char* const end)
 {
-	while ( (start != end) && ((*start == 'x') || (*start == 'y') || ((33 <= *start) && (*start < 33 + alphabetSize))) )
+	while ( (start != end) && ((*start == 'z') || (*start == 'y') || ((33 <= *start) && (*start < 33 + alphabetSize))) )
 		++start;
 
 	char* cursor{ start };
 
 	while ( start != end )
 	{
-		if ( ((33 <= *start) && (*start < 33 + alphabetSize)) || (*start == 'x') || (*start == 'y') )
+		if ( ((33 <= *start) && (*start < 33 + alphabetSize)) || (*start == 'z') || (*start == 'y') )
 			*cursor++ = *start;
 		// else
 		// 	std::cerr << "[skip]";
@@ -252,7 +274,7 @@ char* DiscardInvalids(char* start, char* const end)
 	return cursor;
 }
 
-int Decode(std::istream& instream)
+int Decode(std::istream& instream, std::ostream& outstream)
 {
 	static constexpr size_t bufferSize{ 100 };
 	char buffer[bufferSize];
@@ -266,12 +288,12 @@ int Decode(std::istream& instream)
 			continue; // break saattaisi olla oikeampi
 		
 		char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
-		char* ptr{ DecodeXY(buffer, end) };
+		char* ptr{ DecodeZY(buffer, end, outstream) };
 
 		while ( ptr + 4 < end)
 		{
-			ptr = Decode5(ptr);
-			ptr = DecodeXY(ptr, end);
+			ptr = Decode5(ptr, outstream);
+			ptr = DecodeZY(ptr, end, outstream);
 		}
 
 		// copy leftovers to start of buffer
@@ -286,9 +308,10 @@ int Decode(std::istream& instream)
 		for (size_t i = 0; i < 4; ++i) // pad with the last letter
 			buffer[leftovers + i] = 33 + alphabetSize - 1;
 
-		Decode5(buffer, leftovers - 1);
+		Decode5(buffer, outstream, leftovers - 1);
 	}
 
-	std::cout.flush();
+	//std::cout.flush();
+	outstream.flush();
 	return 0;
 }
