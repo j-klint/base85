@@ -11,7 +11,7 @@
                 "/std:c++17",
                 "/EHsc", // enable exceptions?
                 "/nologo",
-                "/Fe${workspaceFolder}\\built\\a.exe",
+                "/Fe${workspaceFolder}\\built\\z.exe",
                 "${workspaceFolder}\\*.cpp",
                 // "/favor:INTEL64",
                 "/arch:AVX2",
