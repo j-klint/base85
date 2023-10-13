@@ -1,0 +1,1 @@
+copy /Y ..\built\z.exe .

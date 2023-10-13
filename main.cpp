@@ -2,6 +2,28 @@
 #include <fstream>
 #include <string>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+
+struct BinaryMode
+{
+	int oldin, oldout;
+
+	BinaryMode()
+	{
+		oldin = _setmode(_fileno(stdout), O_BINARY);
+		oldout = _setmode(_fileno(stdin), O_BINARY);
+	}
+
+	~BinaryMode()
+	{
+		_setmode(_fileno(stdout), oldin);
+		_setmode(_fileno(stdin), oldout);
+	}
+};
+#endif // _WIN32
+
 struct Parameters
 {
 	char* inputFile{ nullptr };
@@ -16,9 +38,12 @@ Parameters ParseArgs(int argc, char** argv);
 
 int main(int argc, char** argv) try
 {
+#ifdef _WIN32
+	BinaryMode engage;
+#endif
+	
 	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
 	std::ifstream infile;
-
 	Parameters args = ParseArgs(argc, argv);
 
 	if ( args.inputFile )
@@ -40,11 +65,13 @@ int main(int argc, char** argv) try
 }
 catch ( std::string& v )
 {
+	std::cout.flush();
 	std::cerr << v << '\n';
 	return 1;
 }
 catch(const std::exception& e)
 {
+	std::cout.flush();
 	std::cerr << "Exception: " << e.what() << '\n';
 	return 1;
 }
@@ -76,9 +103,12 @@ Parameters ParseArgs(int argc, char** argv)
 					error = true;
 				}
 			}
-			
 			if ( error )
 				throw std::string{ "Couldn't parse wrap parameter." };
+		}
+		else if ( input.size() > 0 && input[0] == '-' )
+		{
+			throw (std::string{ "Unknown switch \"" } + input + "\".");
 		}
 		else
 		{
@@ -140,6 +170,7 @@ int Encode(std::istream& instream, size_t wrap)
 		}
 	}
 
+	std::cout.flush();
 	return 0;
 }
 
@@ -156,7 +187,7 @@ char* DecodeXY(char* start, const char* const end)
 
 		if ( *start == 'x' )
 		{
-			std::cout.write(zeros, 4);
+			//std::cout.write(zeros, 4); // hah hah. ei toimi.
 			++start;
 			again = 1;
 		}
@@ -250,10 +281,14 @@ int Decode(std::istream& instream)
 	}
 
 	// Deal with leftovers
-	for (size_t i = 0; i < 4; ++i) // pad with the last letter
-		buffer[leftovers + i] = 33 + alphabetSize - 1;
+	if ( leftovers > 0 )
+	{
+		for (size_t i = 0; i < 4; ++i) // pad with the last letter
+			buffer[leftovers + i] = 33 + alphabetSize - 1;
 
-	Decode5(buffer, 5 - leftovers);
+		Decode5(buffer, leftovers - 1);
+	}
 
+	std::cout.flush();
 	return 0;
 }
