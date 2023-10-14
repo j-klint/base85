@@ -60,10 +60,10 @@ int main(int argc, char** argv) try
 
 	if ( args.outputFile )
 	{
-		// if ( args.decode )
+		if ( args.decode )
 			outfile.open(args.outputFile, std::ios::binary);
-		// else
-		// 	outfile.open(args.outputFile,std::ios_base::out);
+		else
+			outfile.open(args.outputFile);
 
 		if ( !outfile.good() )
 		{
@@ -144,21 +144,21 @@ int Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 {
 	size_t charsOnThisLine{ 0 };
 
-	auto WrappedPrint = [wrap, &charsOnThisLine, &outstream](char c)
+	auto WrappedPrint = [wrap, &charsOnThisLine, &outstream](unsigned char c)
 	{
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
 			outstream << '\n';
 			charsOnThisLine = 0;
 		}
-		outstream << c;
+		outstream.put(c);
 		++charsOnThisLine;
 	};
 
 	while ( instream.good() )
 	{
-		char buffer[4]{0,0,0,0};
-		instream.read(buffer, 4);
+		unsigned char buffer[4]{0,0,0,0};
+		instream.read(reinterpret_cast<char*>(buffer), 4);
 		size_t bytesRead = instream.gcount();
 
 		if ( bytesRead > 0 )
@@ -177,12 +177,12 @@ int Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 				continue;
 			}
 
-			char output[5];
-			output[4] = 33 + word % alphabetSize;
+			unsigned char output[5];
+			output[4] = 33u + word % alphabetSize;
 			for ( int j = 3; j >= 0; --j )
 			{
 				word /= alphabetSize;
-				output[j] = 33 + word % alphabetSize;
+				output[j] = 33u + word % alphabetSize;
 			}
 
 			size_t writeThisMany = bytesRead + 1;
@@ -191,16 +191,16 @@ int Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 		}
 	}
 
-	//std::cout.flush();
+	outstream << '\n';
 	outstream.flush();
 	return 0;
 }
 
 
-char* DecodeZY(char* start, const char* const end, std::ostream& outstream)
+unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, std::ostream& outstream)
 {
-	static constexpr char zeros[4]{0,0,0,0};
-	static constexpr char spaces[4]{0x20,0x20,0x20,0x20};
+	static constexpr unsigned char zeros[4]{0,0,0,0};
+	static constexpr unsigned char spaces[4]{0x20,0x20,0x20,0x20};
 	
 	bool again{ 1 };
 	while ( again && (start != end) )
@@ -209,13 +209,13 @@ char* DecodeZY(char* start, const char* const end, std::ostream& outstream)
 
 		if ( *start == 'z' )
 		{
-			outstream.write(zeros, 4);
+			outstream.write(reinterpret_cast<const char*>(zeros), 4);
 			++start;
 			again = 1;
 		}
 		else if ( *start == 'y' )
 		{
-			outstream.write(spaces, 4);
+			outstream.write(reinterpret_cast<const char*>(spaces), 4);
 			++start;
 			again = 1;
 		}
@@ -224,7 +224,7 @@ char* DecodeZY(char* start, const char* const end, std::ostream& outstream)
 	return start;
 }
 
-char* Decode5(char* buf, std::ostream& outstream, size_t amount = 4)
+unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amount = 4)
 {
 	uint64_t word{ 0 };
 	static constexpr uint64_t powers[5]{ alphabetSize*alphabetSize*alphabetSize*alphabetSize,
@@ -235,39 +235,37 @@ char* Decode5(char* buf, std::ostream& outstream, size_t amount = 4)
 	
 	for (size_t i = 0; i < 5; ++i)
 	{
-		char c{ *buf++ };
+		unsigned char c{ *buf++ };
 		if ( c == 'z' || c == 'y' )
 			throw std::string{ "Decoding error: 'z' or 'y' in the middle of a group." };
 
-		word += powers[i] * (c - 33);
+		word += powers[i] * (c - 33u);
 	}
-	constexpr char gg{ -50 };
+
 	if ( word > UINT32_MAX )
 		throw std::string{ "Decoding error: Over-big group." };
 
 	for ( size_t i = 0; i < amount; ++i )
 	{
-		outstream.put(char(0xff & (word >> 24)));
+		outstream.put(static_cast<unsigned char>(0xffu & (word >> 24)));
 		word <<= 8;
 	}
 
 	return buf;
 }
 
-char* DiscardInvalids(char* start, char* const end)
+unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
 {
-	while ( (start != end) && ((*start == 'z') || (*start == 'y') || ((33 <= *start) && (*start < 33 + alphabetSize))) )
+	while ( (start != end) && ((*start == 'z') || (*start == 'y') || ((33u <= *start) && (*start < 33u + alphabetSize))) )
 		++start;
 
-	char* cursor{ start };
+	unsigned char* cursor{ start };
 
 	while ( start != end )
 	{
-		if ( ((33 <= *start) && (*start < 33 + alphabetSize)) || (*start == 'z') || (*start == 'y') )
+		if ( ((33u <= *start) && (*start < 33u + alphabetSize)) || (*start == 'z') || (*start == 'y') )
 			*cursor++ = *start;
-		// else
-		// 	std::cerr << "[skip]";
-		
+
 		++start;
 	}
 
@@ -277,18 +275,18 @@ char* DiscardInvalids(char* start, char* const end)
 int Decode(std::istream& instream, std::ostream& outstream)
 {
 	static constexpr size_t bufferSize{ 100 };
-	char buffer[bufferSize];
+	unsigned char buffer[bufferSize];
 	long long leftovers{ 0 };
 
 	while ( instream.good() )
 	{
-		instream.read(buffer + leftovers, bufferSize - leftovers);
+		instream.read(reinterpret_cast<char*>(buffer + leftovers), bufferSize - leftovers);
 		size_t bytesRead = instream.gcount();
 		if ( bytesRead == 0 )
 			continue; // break saattaisi olla oikeampi
 		
-		char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
-		char* ptr{ DecodeZY(buffer, end, outstream) };
+		unsigned char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
+		unsigned char* ptr{ DecodeZY(buffer, end, outstream) };
 
 		while ( ptr + 4 < end)
 		{
@@ -306,12 +304,11 @@ int Decode(std::istream& instream, std::ostream& outstream)
 	if ( leftovers > 0 )
 	{
 		for (size_t i = 0; i < 4; ++i) // pad with the last letter
-			buffer[leftovers + i] = 33 + alphabetSize - 1;
+			buffer[leftovers + i] = 33u + alphabetSize - 1u;
 
 		Decode5(buffer, outstream, leftovers - 1);
 	}
 
-	//std::cout.flush();
 	outstream.flush();
 	return 0;
 }
