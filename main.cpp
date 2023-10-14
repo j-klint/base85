@@ -16,9 +16,9 @@ struct BinaryMode
 		oldin = _setmode(_fileno(stdin), _O_BINARY);
 
 		if ( oldout == -1 )
-			std::cerr << "Failed to set stdout to binary mode.\n";
+			std::cerr << "base85: Failed to set stdout to binary mode.\n";
 		if ( oldin == -1 )
-			std::cerr << "Failed to set stdin to binary mode.\n";
+			std::cerr << "base85: Failed to set stdin to binary mode.\n";
 	}
 
 	~BinaryMode()
@@ -70,10 +70,7 @@ int main(int argc, char** argv) try
 	{
 		infile.open(args.inputFile, std::ios::binary);
 		if ( !infile.good() )
-		{
-			std::cerr << "Unable to open input file.\n";
-			return 1;
-		}
+			throw std::string{ "Unable to open input file." };
 	}
 
 	if ( args.outputFile )
@@ -84,10 +81,7 @@ int main(int argc, char** argv) try
 			outfile.open(args.outputFile);
 
 		if ( !outfile.good() )
-		{
-			std::cerr << "Unable to open output file.\n";
-			return 1;
-		}
+			throw std::string{ "Unable to open output file." };
 	}
 
 	std::istream& instream{ args.inputFile ? infile : std::cin };
@@ -102,14 +96,14 @@ int main(int argc, char** argv) try
 }
 catch ( std::string& v )
 {
-	std::cout.flush();
-	std::cerr << v << '\n';
+	//std::cout.flush();
+	std::cerr << "base85: " << v << '\n';
 	return 1;
 }
 catch(const std::exception& e)
 {
-	std::cout.flush();
-	std::cerr << "Exception: " << e.what() << '\n';
+	//std::cout.flush();
+	std::cerr << "base85: An unanticipated exception occurred: " << e.what() << '\n';
 	return 1;
 }
 
@@ -126,7 +120,7 @@ Parameters ParseArgs(int argc, char** argv)
 		{
 			retval.decode = true;
 		}
-		else if ( input == "-h" || input == "--help" )
+		else if ( input == "-h" || input == "--help" || input == "--halp" )
 		{
 			retval.help = true;
 		}
@@ -149,7 +143,7 @@ Parameters ParseArgs(int argc, char** argv)
 		}
 		else if ( input.size() > 0 && input[0] == '-' )
 		{
-			throw (std::string{ "Unknown switch \"" } + input + "\".");
+			throw (std::string{ "Unknown switch \"" } + input + "\"");
 		}
 		else if ( retval.inputFile )
 		{

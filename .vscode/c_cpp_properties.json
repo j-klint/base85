@@ -17,7 +17,7 @@
             "intelliSenseMode": "windows-msvc-x64"
         },
         {
-            "name": "Linunx",
+            "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
