@@ -8,18 +8,23 @@
 
 struct BinaryMode
 {
-	int oldin, oldout;
+	int oldin{ -1 }, oldout{ -1 };
 
 	BinaryMode()
 	{
-		oldin = _setmode(_fileno(stdout), O_BINARY);
-		oldout = _setmode(_fileno(stdin), O_BINARY);
+		oldout = _setmode(_fileno(stdout), _O_BINARY);
+		oldin = _setmode(_fileno(stdin), _O_BINARY);
+
+		if ( oldout == -1 )
+			std::cerr << "Failed to set stdout to binary mode.\n";
+		if ( oldin == -1 )
+			std::cerr << "Failed to set stdin to binary mode.\n";
 	}
 
 	~BinaryMode()
 	{
-		_setmode(_fileno(stdout), oldin);
-		_setmode(_fileno(stdin), oldout);
+		if ( oldout != -1 ) _setmode(_fileno(stdout), oldout);
+		if ( oldin != -1 ) _setmode(_fileno(stdin), oldin);
 	}
 };
 #endif // _WIN32
@@ -30,30 +35,43 @@ struct Parameters
 	char* outputFile{ nullptr };
 	int wrap{ 75 };
 	bool decode{ false };
+	bool help{ false };
 };
 
 static constexpr uint32_t alphabetSize{ 85 };
-int Encode(std::istream& instream, size_t wrap, std::ostream& outstream);
-int Decode(std::istream& instream, std::ostream& outstream);
+
 Parameters ParseArgs(int argc, char** argv);
+void Encode(std::istream& instream, size_t wrap, std::ostream& outstream);
+void Decode(std::istream& instream, std::ostream& outstream);
+unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end);
+unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amount = 4);
+unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, std::ostream& outstream);
+void DisplayHelp(const char*);
 
 int main(int argc, char** argv) try
 {
+	Parameters args = ParseArgs(argc, argv);
+	if ( args.help )
+	{
+		DisplayHelp(argv[0]);
+		return 0;
+	}
+
+	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
+
 #ifdef _WIN32
 	BinaryMode engage;
 #endif
 	
-	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
 	std::ifstream infile;
 	std::ofstream outfile;
-	Parameters args = ParseArgs(argc, argv);
 
 	if ( args.inputFile )
 	{
 		infile.open(args.inputFile, std::ios::binary);
 		if ( !infile.good() )
 		{
-			std::cerr << "Unable to open input file.";
+			std::cerr << "Unable to open input file.\n";
 			return 1;
 		}
 	}
@@ -67,7 +85,7 @@ int main(int argc, char** argv) try
 
 		if ( !outfile.good() )
 		{
-			std::cerr << "Unable to open output file.";
+			std::cerr << "Unable to open output file.\n";
 			return 1;
 		}
 	}
@@ -76,9 +94,11 @@ int main(int argc, char** argv) try
 	std::ostream& outstream{ args.outputFile ? outfile : std::cout };
 
 	if ( args.decode )
-		return Decode(instream, outstream);
+		Decode(instream, outstream);
 	else
-		return Encode(instream, args.wrap, outstream);
+		Encode(instream, args.wrap, outstream);
+	
+	return 0;
 }
 catch ( std::string& v )
 {
@@ -106,6 +126,10 @@ Parameters ParseArgs(int argc, char** argv)
 		{
 			retval.decode = true;
 		}
+		else if ( input == "-h" || input == "--help" )
+		{
+			retval.help = true;
+		}
 		else if ( input == "-w" || input == "--wrap" )
 		{
 			bool error{ argc <= i + 1 };
@@ -121,7 +145,7 @@ Parameters ParseArgs(int argc, char** argv)
 				}
 			}
 			if ( error )
-				throw std::string{ "Couldn't parse wrap parameter." };
+				throw std::string{ "Couldn't parse the --wrap parameter." };
 		}
 		else if ( input.size() > 0 && input[0] == '-' )
 		{
@@ -140,7 +164,7 @@ Parameters ParseArgs(int argc, char** argv)
 	return retval;
 }
 
-int Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
+void Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 {
 	size_t charsOnThisLine{ 0 };
 
@@ -193,9 +217,7 @@ int Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 
 	outstream << '\n';
 	outstream.flush();
-	return 0;
 }
-
 
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, std::ostream& outstream)
 {
@@ -224,7 +246,7 @@ unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, st
 	return start;
 }
 
-unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amount = 4)
+unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amount)
 {
 	uint64_t word{ 0 };
 	static constexpr uint64_t powers[5]{ alphabetSize*alphabetSize*alphabetSize*alphabetSize,
@@ -272,7 +294,7 @@ unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
 	return cursor;
 }
 
-int Decode(std::istream& instream, std::ostream& outstream)
+void Decode(std::istream& instream, std::ostream& outstream)
 {
 	static constexpr size_t bufferSize{ 100 };
 	unsigned char buffer[bufferSize];
@@ -310,5 +332,15 @@ int Decode(std::istream& instream, std::ostream& outstream)
 	}
 
 	outstream.flush();
-	return 0;
+}
+
+void DisplayHelp(const char*)
+{
+	std::cout <<
+	"The first filename's the input file, the second the output.\n"
+	"If no filename is provided stdin or stdout is used instead.\n"
+	"Switches:\n"
+	"  -d, --decode\n"
+	"  -w, --wrap\n"
+	"  -h, --help\n";
 }
