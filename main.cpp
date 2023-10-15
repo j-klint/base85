@@ -96,13 +96,11 @@ int main(int argc, char** argv) try
 }
 catch ( std::string& v )
 {
-	//std::cout.flush();
 	std::cerr << "base85: " << v << '\n';
 	return 1;
 }
 catch(const std::exception& e)
 {
-	//std::cout.flush();
 	std::cerr << "base85: An unanticipated exception occurred: " << e.what() << '\n';
 	return 1;
 }
@@ -213,6 +211,64 @@ void Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 	outstream.flush();
 }
 
+void Decode(std::istream& instream, std::ostream& outstream)
+{
+	static constexpr size_t bufferSize{ 100 };
+	unsigned char buffer[bufferSize];
+	long long leftovers{ 0 };
+
+	while ( instream.good() )
+	{
+		instream.read(reinterpret_cast<char*>(buffer + leftovers), bufferSize - leftovers);
+		size_t bytesRead = instream.gcount();
+		if ( bytesRead == 0 )
+			continue; // break saattaisi olla oikeampi
+		
+		unsigned char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
+		unsigned char* ptr{ DecodeZY(buffer, end, outstream) };
+
+		while ( ptr + 4 < end)
+		{
+			ptr = Decode5(ptr, outstream);
+			ptr = DecodeZY(ptr, end, outstream);
+		}
+
+		// copy leftovers to start of buffer
+		leftovers = end - ptr;
+		for (int i = 0; i < leftovers; ++i)
+			buffer[i] = ptr[i];
+	}
+
+	// Deal with leftovers
+	if ( leftovers > 0 )
+	{
+		for (size_t i = 0; i < 4; ++i) // pad with the last letter
+			buffer[leftovers + i] = 33u + alphabetSize - 1u;
+
+		Decode5(buffer, outstream, leftovers - 1);
+	}
+
+	outstream.flush();
+}
+
+unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
+{
+	while ( (start != end) && ((*start == 'z') || (*start == 'y') || ((33 <= *start) && (*start < 33 + alphabetSize))) )
+		++start;
+
+	unsigned char* cursor{ start };
+
+	while ( start != end )
+	{
+		if ( ((33 <= *start) && (*start < 33 + alphabetSize)) || (*start == 'z') || (*start == 'y') )
+			*cursor++ = *start;
+
+		++start;
+	}
+
+	return cursor;
+}
+
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, std::ostream& outstream)
 {
 	static constexpr unsigned char zeros[4]{0,0,0,0};
@@ -270,69 +326,11 @@ unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amoun
 	return buf;
 }
 
-unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
-{
-	while ( (start != end) && ((*start == 'z') || (*start == 'y') || ((33u <= *start) && (*start < 33u + alphabetSize))) )
-		++start;
-
-	unsigned char* cursor{ start };
-
-	while ( start != end )
-	{
-		if ( ((33u <= *start) && (*start < 33u + alphabetSize)) || (*start == 'z') || (*start == 'y') )
-			*cursor++ = *start;
-
-		++start;
-	}
-
-	return cursor;
-}
-
-void Decode(std::istream& instream, std::ostream& outstream)
-{
-	static constexpr size_t bufferSize{ 100 };
-	unsigned char buffer[bufferSize];
-	long long leftovers{ 0 };
-
-	while ( instream.good() )
-	{
-		instream.read(reinterpret_cast<char*>(buffer + leftovers), bufferSize - leftovers);
-		size_t bytesRead = instream.gcount();
-		if ( bytesRead == 0 )
-			continue; // break saattaisi olla oikeampi
-		
-		unsigned char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
-		unsigned char* ptr{ DecodeZY(buffer, end, outstream) };
-
-		while ( ptr + 4 < end)
-		{
-			ptr = Decode5(ptr, outstream);
-			ptr = DecodeZY(ptr, end, outstream);
-		}
-
-		// copy leftovers to start of buffer
-		leftovers = end - ptr;
-		for (int i = 0; i < leftovers; ++i)
-			buffer[i] = ptr[i];
-	}
-
-	// Deal with leftovers
-	if ( leftovers > 0 )
-	{
-		for (size_t i = 0; i < 4; ++i) // pad with the last letter
-			buffer[leftovers + i] = 33u + alphabetSize - 1u;
-
-		Decode5(buffer, outstream, leftovers - 1);
-	}
-
-	outstream.flush();
-}
-
 void DisplayHelp(const char*)
 {
 	std::cout <<
 	"The first filename's the input file, the second the output.\n"
-	"If no filename is provided stdin or stdout is used instead.\n"
+	"If no filename is provided then stdin or stdout is used instead.\n"
 	"Switches:\n"
 	"  -d, --decode\n"
 	"  -w, --wrap\n"
