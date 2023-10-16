@@ -209,7 +209,11 @@ void Encode(std::istream& instream, size_t wrap)
 		}
 	}
 
-	std::cout << '\n';
+#ifdef _WIN32
+	if ( gBinaryModeGood )
+		std::cout.put('\r');
+#endif
+	std::cout.put('\n');
 	std::cout.flush();
 }
 
