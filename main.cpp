@@ -27,6 +27,8 @@ struct BinaryMode
 		if ( oldin != -1 ) _setmode(_fileno(stdin), oldin);
 	}
 };
+
+bool gBinaryModeGood;
 #endif // _WIN32
 
 struct Parameters
@@ -60,6 +62,7 @@ int main(int argc, char** argv) try
 
 #ifdef _WIN32
 	BinaryMode engage;
+	gBinaryModeGood = engage.oldout != -1;
 #endif
 	
 	std::ifstream infile;
@@ -160,10 +163,10 @@ void Encode(std::istream& instream, size_t wrap)
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
 #ifdef _WIN32
-			std::cout.put('\r').put('\n');
-#else
-			std::cout.put('\n');
+			if ( gBinaryModeGood )
+				std::cout.put('\r');
 #endif
+			std::cout.put('\n');
 			charsOnThisLine = 0;
 		}
 		std::cout.put(c);
