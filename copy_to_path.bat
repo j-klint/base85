@@ -1,0 +1,1 @@
+copy /Y built\base85.exe %HOMEDRIVE%%HOMEPATH%\batit

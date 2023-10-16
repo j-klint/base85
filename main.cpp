@@ -37,6 +37,7 @@ struct Parameters
 	int wrap{ 75 };
 	bool decode{ false };
 	bool help{ false };
+	bool version{ false };
 };
 
 static constexpr uint32_t alphabetSize{ 85 };
@@ -55,6 +56,12 @@ int main(int argc, char** argv) try
 	if ( args.help )
 	{
 		DisplayHelp();
+		return 0;
+	}
+
+	if ( args.version )
+	{
+		std::cout << "This executable was compiled on " << __DATE__ << " " << __TIME__ << "\n";
 		return 0;
 	}
 
@@ -116,6 +123,10 @@ Parameters ParseArgs(int argc, char** argv)
 		if ( input == "-d" || input == "--decode" )
 		{
 			retval.decode = true;
+		}
+		else if ( input == "-v" || input == "--version" )
+		{
+			retval.version = true;
 		}
 		else if ( input == "-h" || input == "--help" || input == "--halp" || input == "-?"
 #ifdef _WIN32
@@ -336,9 +347,10 @@ void DisplayHelp()
 	"base85 [OPTIONS] [INPUTFILE]\n\n"
 
 	"Options:\n"
-	"  -d, --decode      Self explanatory.\n"
-	"  -w N, --wrap N    Split encoding output to lines N characters long.\n"
-	"  -h, -?, --help    Display this help.\n\n"
+	"  -d, --decode      self explanatory\n"
+	"  -w N, --wrap N    split encoding output to lines N characters long\n"
+	"  -h, -?, --help    display this help\n"
+	"  -v, --version     version info\n\n"
 
 	"When decoding a binary file please remember to redirect the output to a file."
 	<< std::endl;
