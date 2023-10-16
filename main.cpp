@@ -159,7 +159,11 @@ void Encode(std::istream& instream, size_t wrap)
 	{
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
-			std::cout << '\n';
+#ifdef _WIN32
+			std::cout.put('\r').put('\n');
+#else
+			std::cout.put('\n');
+#endif
 			charsOnThisLine = 0;
 		}
 		std::cout.put(c);
