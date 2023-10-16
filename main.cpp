@@ -53,6 +53,7 @@ void DisplayHelp();
 int main(int argc, char** argv) try
 {
 	Parameters args = ParseArgs(argc, argv);
+	
 	if ( args.help )
 	{
 		DisplayHelp();
@@ -61,7 +62,7 @@ int main(int argc, char** argv) try
 
 	if ( args.version )
 	{
-		std::cout << "This executable was compiled on " << __DATE__ << " " << __TIME__ << "\n";
+		std::cout << "This executable was compiled on " __DATE__ " " __TIME__ "\n";
 		return 0;
 	}
 
@@ -90,7 +91,7 @@ int main(int argc, char** argv) try
 	
 	return 0;
 }
-catch ( std::ios_base::failure f )
+catch ( std::ios_base::failure& f )
 {
 	std::cerr << "base85: I/O error: " << f.what() << '\n';
 	return 1;
@@ -340,18 +341,21 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 
 void DisplayHelp()
 {
-	std::cout <<
-	"Encode or decode base85 to stdout. If no filename is provided then stdin is\n"
-	"used for input. Usage:\n\n"
+std::cout <<
+"Encode or decode Base85/Ascii85 to stdout. If no filename is provided then\n"
+"stdin is used for input. Usage:\n\n"
 
-	"base85 [OPTIONS] [INPUTFILE]\n\n"
+"base85 [OPTION(S)] [INPUTFILE]\n\n"
 
-	"Options:\n"
-	"  -d, --decode      self explanatory\n"
-	"  -w N, --wrap N    split encoding output to lines N characters long\n"
-	"  -h, -?, --help    display this help\n"
-	"  -v, --version     version info\n\n"
+"Options:\n"
+"  -d, --decode    Hopefully self explanatory.\n"
+"  -w N, --wrap N  Split encoded output to lines N characters long.\n"
+"                  Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
+"  -h, -?, --help  Display this help.\n"
+"  -v, --version   Version info.\n\n"
 
-	"When decoding a binary file please remember to redirect the output to a file."
-	<< std::endl;
+"During decoding all bytes not in the base85 alphabet will be ignored\n"
+"(i.e. skipped). If you want your output written to a file then please use\n"
+"the redirection operator \">\" appropriately."
+<< std::endl;
 }
