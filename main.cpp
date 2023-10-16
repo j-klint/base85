@@ -342,20 +342,18 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 void DisplayHelp()
 {
 std::cout <<
-"Encode or decode Base85/Ascii85 to stdout. If no filename is provided then\n"
-"stdin is used for input. Usage:\n\n"
+"Encode or decode Base85/Ascii85 to stdout.\n\n"
 
-"base85 [OPTION(S)] [INPUTFILE]\n\n"
+"Switches:\n"
+"  -d, --decode     Hopefully self explanatory.\n"
+"  -w N, --wrap N   Split encoded output to lines N characters long.\n"
+"                   Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
+"  -h, -?, --help   Display this help.\n"
+"  -v, --version    Version info.\n\n"
 
-"Options:\n"
-"  -d, --decode    Hopefully self explanatory.\n"
-"  -w N, --wrap N  Split encoded output to lines N characters long.\n"
-"                  Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
-"  -h, -?, --help  Display this help.\n"
-"  -v, --version   Version info.\n\n"
-
-"During decoding all bytes not in the base85 alphabet will be ignored\n"
-"(i.e. skipped). If you want your output written to a file then please use\n"
-"the redirection operator \">\" appropriately."
+"If no filename is provided then stdin is used for input. During decoding\n"
+"all bytes not in the base85 alphabet will be ignored (i.e. skipped). If\n"
+"you want your output written to a file then please use the redirection\n"
+"operator \">\" appropriately."
 << std::endl;
 }
