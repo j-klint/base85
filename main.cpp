@@ -294,11 +294,6 @@ unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end)
 unsigned char* Decode5(unsigned char* buf, size_t amount)
 {
 	uint64_t word{ 0 };
-	static constexpr uint64_t powers[5]{ alphabetSize*alphabetSize*alphabetSize*alphabetSize,
-	                                     alphabetSize*alphabetSize*alphabetSize,
-	                                     alphabetSize*alphabetSize,
-	                                     alphabetSize,
-	                                     1 };
 	
 	for (size_t i = 0; i < 5; ++i)
 	{
@@ -306,7 +301,7 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 		if ( c == 'z' || c == 'y' )
 			throw std::string{ "Decoding error: 'z' or 'y' in the middle of a group." };
 
-		word += powers[i] * (c - 33u);
+		word = word * alphabetSize + c - 33u;
 	}
 
 	if ( word > UINT32_MAX )
