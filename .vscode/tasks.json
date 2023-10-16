@@ -11,7 +11,7 @@
                 "/std:c++17",
                 "/EHsc", // enable exceptions?
                 "/nologo",
-                "/Fe${workspaceFolder}\\built\\z.exe",
+                "/Fe${workspaceFolder}\\built\\base85.exe",
                 "${workspaceFolder}\\*.cpp",
                 // "/favor:INTEL64",
                 "/arch:AVX2",
@@ -20,8 +20,9 @@
                 "/O2",  // optimize for speed
                 "/GL",  // "Whole program optimization"
                 "/Gw",  // Optimize Global Data
-                "/MT",  // link with LIBCMT.LIB
-                //"/DNDEBUG", // #define NDEBUG, ks. c_cpp_properties.json
+                //"/MT",  // link with LIBCMT.LIB
+                "/MD",  // link with MSVCRT.LIB
+                "/DNDEBUG", // #define NDEBUG, ks. c_cpp_properties.json
                 // "/MTd", //MTd link with LIBCMTD.LIB debug lib
                 // "/Zi",  //enable debug
                 "/link",

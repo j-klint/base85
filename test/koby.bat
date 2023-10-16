@@ -1,1 +1,1 @@
-copy /Y ..\built\z.exe .
+copy /Y ..\built\base85.exe .

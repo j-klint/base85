@@ -32,7 +32,6 @@ struct BinaryMode
 struct Parameters
 {
 	char* inputFile{ nullptr };
-	char* outputFile{ nullptr };
 	int wrap{ 75 };
 	bool decode{ false };
 	bool help{ false };
@@ -41,19 +40,19 @@ struct Parameters
 static constexpr uint32_t alphabetSize{ 85 };
 
 Parameters ParseArgs(int argc, char** argv);
-void Encode(std::istream& instream, size_t wrap, std::ostream& outstream);
-void Decode(std::istream& instream, std::ostream& outstream);
+void Encode(std::istream& instream, size_t wrap);
+void Decode(std::istream& instream);
 unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end);
-unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amount = 4);
-unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, std::ostream& outstream);
-void DisplayHelp(const char*);
+unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
+unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
+void DisplayHelp();
 
 int main(int argc, char** argv) try
 {
 	Parameters args = ParseArgs(argc, argv);
 	if ( args.help )
 	{
-		DisplayHelp(argv[0]);
+		DisplayHelp();
 		return 0;
 	}
 
@@ -64,7 +63,6 @@ int main(int argc, char** argv) try
 #endif
 	
 	std::ifstream infile;
-	std::ofstream outfile;
 
 	if ( args.inputFile )
 	{
@@ -73,26 +71,19 @@ int main(int argc, char** argv) try
 			throw std::string{ "Unable to open input file." };
 	}
 
-	if ( args.outputFile )
-	{
-		if ( args.decode )
-			outfile.open(args.outputFile, std::ios::binary);
-		else
-			outfile.open(args.outputFile);
-
-		if ( !outfile.good() )
-			throw std::string{ "Unable to open output file." };
-	}
-
 	std::istream& instream{ args.inputFile ? infile : std::cin };
-	std::ostream& outstream{ args.outputFile ? outfile : std::cout };
 
 	if ( args.decode )
-		Decode(instream, outstream);
+		Decode(instream);
 	else
-		Encode(instream, args.wrap, outstream);
+		Encode(instream, args.wrap);
 	
 	return 0;
+}
+catch ( std::ios_base::failure f )
+{
+	std::cerr << "base85: I/O error: " << f.what() << '\n';
+	return 1;
 }
 catch ( std::string& v )
 {
@@ -102,6 +93,11 @@ catch ( std::string& v )
 catch(const std::exception& e)
 {
 	std::cerr << "base85: An unanticipated exception occurred: " << e.what() << '\n';
+	return 1;
+}
+catch( ... )
+{
+	std::cerr << "base85: An unknown exception occurred!\n";
 	return 1;
 }
 
@@ -118,8 +114,11 @@ Parameters ParseArgs(int argc, char** argv)
 		{
 			retval.decode = true;
 		}
-		else if ( input == "-h" || input == "--help" || input == "--halp" )
-		{
+		else if ( input == "-h" || input == "--help" || input == "--halp" || input == "-?"
+#ifdef _WIN32
+		|| input == "/?"
+#endif
+		) {
 			retval.help = true;
 		}
 		else if ( input == "-w" || input == "--wrap" )
@@ -143,10 +142,6 @@ Parameters ParseArgs(int argc, char** argv)
 		{
 			throw (std::string{ "Unknown switch \"" } + input + "\"");
 		}
-		else if ( retval.inputFile )
-		{
-			retval.outputFile = argv[i];
-		}
 		else
 		{
 			retval.inputFile = argv[i];
@@ -156,18 +151,18 @@ Parameters ParseArgs(int argc, char** argv)
 	return retval;
 }
 
-void Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
+void Encode(std::istream& instream, size_t wrap)
 {
 	size_t charsOnThisLine{ 0 };
 
-	auto WrappedPrint = [wrap, &charsOnThisLine, &outstream](unsigned char c)
+	auto WrappedPrint = [wrap, &charsOnThisLine](unsigned char c)
 	{
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
-			outstream << '\n';
+			std::cout << '\n';
 			charsOnThisLine = 0;
 		}
-		outstream.put(c);
+		std::cout.put(c);
 		++charsOnThisLine;
 	};
 
@@ -207,11 +202,11 @@ void Encode(std::istream& instream, size_t wrap, std::ostream& outstream)
 		}
 	}
 
-	outstream << '\n';
-	outstream.flush();
+	std::cout << '\n';
+	std::cout.flush();
 }
 
-void Decode(std::istream& instream, std::ostream& outstream)
+void Decode(std::istream& instream)
 {
 	static constexpr size_t bufferSize{ 100 };
 	unsigned char buffer[bufferSize];
@@ -225,12 +220,12 @@ void Decode(std::istream& instream, std::ostream& outstream)
 			continue; // break saattaisi olla oikeampi
 		
 		unsigned char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
-		unsigned char* ptr{ DecodeZY(buffer, end, outstream) };
+		unsigned char* ptr{ DecodeZY(buffer, end) };
 
 		while ( ptr + 4 < end)
 		{
-			ptr = Decode5(ptr, outstream);
-			ptr = DecodeZY(ptr, end, outstream);
+			ptr = Decode5(ptr);
+			ptr = DecodeZY(ptr, end);
 		}
 
 		// copy leftovers to start of buffer
@@ -245,10 +240,10 @@ void Decode(std::istream& instream, std::ostream& outstream)
 		for (size_t i = 0; i < 4; ++i) // pad with the last letter
 			buffer[leftovers + i] = 33u + alphabetSize - 1u;
 
-		Decode5(buffer, outstream, leftovers - 1);
+		Decode5(buffer, leftovers - 1);
 	}
 
-	outstream.flush();
+	std::cout.flush();
 }
 
 unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
@@ -269,7 +264,7 @@ unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
 	return cursor;
 }
 
-unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, std::ostream& outstream)
+unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end)
 {
 	static constexpr unsigned char zeros[4]{0,0,0,0};
 	static constexpr unsigned char spaces[4]{0x20,0x20,0x20,0x20};
@@ -281,13 +276,13 @@ unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, st
 
 		if ( *start == 'z' )
 		{
-			outstream.write(reinterpret_cast<const char*>(zeros), 4);
+			std::cout.write(reinterpret_cast<const char*>(zeros), 4);
 			++start;
 			again = 1;
 		}
 		else if ( *start == 'y' )
 		{
-			outstream.write(reinterpret_cast<const char*>(spaces), 4);
+			std::cout.write(reinterpret_cast<const char*>(spaces), 4);
 			++start;
 			again = 1;
 		}
@@ -296,7 +291,7 @@ unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end, st
 	return start;
 }
 
-unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amount)
+unsigned char* Decode5(unsigned char* buf, size_t amount)
 {
 	uint64_t word{ 0 };
 	static constexpr uint64_t powers[5]{ alphabetSize*alphabetSize*alphabetSize*alphabetSize,
@@ -319,20 +314,26 @@ unsigned char* Decode5(unsigned char* buf, std::ostream& outstream, size_t amoun
 
 	for ( size_t i = 0; i < amount; ++i )
 	{
-		outstream.put(static_cast<unsigned char>(0xffu & (word >> 24)));
+		std::cout.put(static_cast<unsigned char>(0xffu & (word >> 24)));
 		word <<= 8;
 	}
 
 	return buf;
 }
 
-void DisplayHelp(const char*)
+void DisplayHelp()
 {
 	std::cout <<
-	"The first filename's the input file, the second the output.\n"
-	"If no filename is provided then stdin or stdout is used instead.\n"
-	"Switches:\n"
-	"  -d, --decode\n"
-	"  -w, --wrap\n"
-	"  -h, --help\n";
+	"Encode or decode base85 to stdout. If no filename is provided then stdin is\n"
+	"used for input. Usage:\n\n"
+
+	"base85 [OPTIONS] [INPUTFILE]\n\n"
+
+	"Options:\n"
+	"  -d, --decode      Self explanatory.\n"
+	"  -w N, --wrap N    Split encoding output to lines N characters long.\n"
+	"  -h, -?, --help    Display this help.\n\n"
+
+	"When decoding a binary file please remember to redirect the output to a file."
+	<< std::endl;
 }
