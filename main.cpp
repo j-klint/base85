@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <array>
 
 #ifdef _WIN32
 #include <io.h>
@@ -34,13 +35,21 @@ bool gBinaryModeGood;
 struct Parameters
 {
 	char* inputFile{ nullptr };
+	char* alphaFile{ nullptr };
 	int wrap{ 75 };
 	bool decode{ false };
 	bool help{ false };
 	bool version{ false };
+	bool disableZ{ false };
+	bool disableY{ false };
 };
 
+Parameters Args;
 static constexpr uint32_t alphabetSize{ 85 };
+static constexpr unsigned char AlphaEncDefault[]{ R"++(!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuzy)++" };
+static unsigned char AlphaEncMutable[88];
+static const unsigned char* AlphaEnc;
+static std::array<int, 256> AlphaDec;
 
 Parameters ParseArgs(int argc, char** argv);
 void Encode(std::istream& instream, size_t wrap);
@@ -50,17 +59,58 @@ unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
 void DisplayHelp();
 
+void InitAlphabet(Parameters& args)
+{
+	if ( args.alphaFile )
+	{
+		AlphaEnc = AlphaEncMutable;
+		std::ifstream af(args.alphaFile, std::ios::binary);
+		if ( !af.good() )
+				throw std::string{ "Unable to open alphabet file." };
+		
+		af.read(reinterpret_cast<char*>(AlphaEncMutable), 87);
+		auto bytesRead = af.gcount();
+		if ( bytesRead < 85 )
+			throw std::string{ "Not enough characters in the alphabet file." };
+		if ( bytesRead < 87 )
+			args.disableY = true;
+		if ( bytesRead < 85 )
+			args.disableZ = true;
+	}
+	else
+	{
+		AlphaEnc = AlphaEncDefault;
+	}
+
+	if ( args.decode )
+	{
+		// Tähän pitäis lisätä tarkistus, ettei ole moneen kertaan sama merkki.
+		// Myös nuille z:lle ja y:lle. Parasta tehdä lambda.
+
+		AlphaDec.fill(-1);
+		for (size_t i = 0; i < 87; ++i)
+		{
+			AlphaDec[AlphaEnc[i]] = AlphaEnc[i];
+		}
+		if ( args.disableZ )
+			AlphaDec[AlphaEnc[85]] = -1;
+		if ( args.disableY )
+			AlphaDec[AlphaEnc[86]] = -1;
+	}
+}
+
 int main(int argc, char** argv) try
 {
-	Parameters args = ParseArgs(argc, argv);
+	// Parameters args = ParseArgs(argc, argv);
+	Args = ParseArgs(argc, argv);
 	
-	if ( args.help )
+	if ( Args.help )
 	{
 		DisplayHelp();
 		return 0;
 	}
 
-	if ( args.version )
+	if ( Args.version )
 	{
 		std::cout << "This executable was compiled on " __DATE__ " " __TIME__ "\n";
 		return 0;
@@ -75,19 +125,19 @@ int main(int argc, char** argv) try
 	
 	std::ifstream infile;
 
-	if ( args.inputFile )
+	if ( Args.inputFile )
 	{
-		infile.open(args.inputFile, std::ios::binary);
+		infile.open(Args.inputFile, std::ios::binary);
 		if ( !infile.good() )
 			throw std::string{ "Unable to open input file." };
 	}
 
-	std::istream& instream{ args.inputFile ? infile : std::cin };
+	std::istream& instream{ Args.inputFile ? infile : std::cin };
 
-	if ( args.decode )
+	if ( Args.decode )
 		Decode(instream);
 	else
-		Encode(instream, args.wrap);
+		Encode(instream, Args.wrap);
 	
 	return 0;
 }
@@ -151,7 +201,7 @@ Parameters ParseArgs(int argc, char** argv)
 				}
 			}
 			if ( error )
-				throw std::string{ "Couldn't parse the --wrap parameter." };
+				throw std::string{ "Couldn't parse the wrap parameter." };
 		}
 		else if ( input.size() > 0 && input[0] == '-' )
 		{
@@ -322,7 +372,7 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 	{
 		unsigned char c{ *buf++ };
 		if ( c == 'z' || c == 'y' )
-			throw std::string{ "Decoding error: 'z' or 'y' in the middle of a group." };
+			throw (std::string{ "Decoding error: Abbreviation '" } + char(c) + "' in the middle of a group.");
 
 		word = word * alphabetSize + c - 33u;
 	}
@@ -342,18 +392,21 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 void DisplayHelp()
 {
 std::cout <<
-"Encode or decode Base85/Ascii85 to stdout.\n\n"
+"Encode or decode Base85/Ascii85 to stdout from file or stdin.\n\n"
 
 "Switches:\n"
-"  -d, --decode     Hopefully self explanatory.\n"
-"  -w N, --wrap N   Split encoded output to lines N characters long.\n"
-"                   Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
-"  -h, -?, --help   Display this help.\n"
-"  -v, --version    Version info.\n\n"
+"  -d, --decode               Hopefully self explanatory.\n"
+"  -w N, --wrap N             Split encoded output into lines N characters long.\n"
+"                             Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
+"  -a FILE, --alphabet FILE   Read custom alphabet from file FILE.\n"
+"  -z                         Disable the 'z' abbreviation for zeros.\n"
+"  -y                         Disable the 'y' abbreviation for spaces.\n"
+"  -?, -h, --help             Display this help.\n"
+"  -v, --version              Version info.\n\n"
 
-"If no filename is provided then stdin is used for input. During decoding\n"
-"all bytes not in the base85 alphabet will be ignored (i.e. skipped). If\n"
-"you want your output written to a file then please use the redirection\n"
+"If no input filename is provided then stdin is used for input. During decoding\n"
+"all bytes not in the base85 alphabet will be ignored (i.e. skipped).\n"
+"If you want your output written to a file then please use the redirection\n"
 "operator \">\" appropriately."
 << std::endl;
 }
