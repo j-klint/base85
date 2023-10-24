@@ -29,7 +29,7 @@ struct BinaryMode
 	}
 };
 
-bool gBinaryModeGood;
+static bool BinaryModeGood;
 #endif // _WIN32
 
 struct Parameters
@@ -44,14 +44,14 @@ struct Parameters
 	bool disableY{ false };
 };
 
-Parameters Args;
-static constexpr uint32_t alphabetSize{ 85 };
+static Parameters Options;
 static constexpr unsigned char AlphaEncDefault[]{ R"++(!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuzy)++" };
-static unsigned char AlphaEncMutable[88];
-static const unsigned char* AlphaEnc;
+static unsigned char AlphaEncMutable[87];
+static const unsigned char* AlphaEnc{ AlphaEncDefault };
 static std::array<int, 256> AlphaDec;
 
 Parameters ParseArgs(int argc, char** argv);
+void InitAlphabet(Parameters& args);
 void Encode(std::istream& instream, size_t wrap);
 void Decode(std::istream& instream);
 unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end);
@@ -59,85 +59,49 @@ unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
 void DisplayHelp();
 
-void InitAlphabet(Parameters& args)
-{
-	if ( args.alphaFile )
-	{
-		AlphaEnc = AlphaEncMutable;
-		std::ifstream af(args.alphaFile, std::ios::binary);
-		if ( !af.good() )
-				throw std::string{ "Unable to open alphabet file." };
-		
-		af.read(reinterpret_cast<char*>(AlphaEncMutable), 87);
-		auto bytesRead = af.gcount();
-		if ( bytesRead < 85 )
-			throw std::string{ "Not enough characters in the alphabet file." };
-		if ( bytesRead < 87 )
-			args.disableY = true;
-		if ( bytesRead < 85 )
-			args.disableZ = true;
-	}
-	else
-	{
-		AlphaEnc = AlphaEncDefault;
-	}
-
-	if ( args.decode )
-	{
-		// Tähän pitäis lisätä tarkistus, ettei ole moneen kertaan sama merkki.
-		// Myös nuille z:lle ja y:lle. Parasta tehdä lambda.
-
-		AlphaDec.fill(-1);
-		for (size_t i = 0; i < 87; ++i)
-		{
-			AlphaDec[AlphaEnc[i]] = AlphaEnc[i];
-		}
-		if ( args.disableZ )
-			AlphaDec[AlphaEnc[85]] = -1;
-		if ( args.disableY )
-			AlphaDec[AlphaEnc[86]] = -1;
-	}
-}
 
 int main(int argc, char** argv) try
 {
 	// Parameters args = ParseArgs(argc, argv);
-	Args = ParseArgs(argc, argv);
+	Options = ParseArgs(argc, argv);
 	
-	if ( Args.help )
+	if ( Options.help )
 	{
 		DisplayHelp();
 		return 0;
 	}
 
-	if ( Args.version )
+	if ( Options.version )
 	{
 		std::cout << "This executable was compiled on " __DATE__ " " __TIME__ "\n";
 		return 0;
 	}
 
+	if ( Options.decode || Options.alphaFile )
+		InitAlphabet(Options);
+
 	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
 
 #ifdef _WIN32
 	BinaryMode engage;
-	gBinaryModeGood = engage.oldout != -1;
+	BinaryModeGood = engage.oldout != -1;
 #endif
 	
 	std::ifstream infile;
 
-	if ( Args.inputFile )
+	if ( Options.inputFile )
 	{
-		infile.open(Args.inputFile, std::ios::binary);
+		infile.open(Options.inputFile, std::ios::binary);
 		if ( !infile.good() )
-			throw std::string{ "Unable to open input file." };
+			throw (std::string{ "Unable to open input file \"" } + Options.inputFile + "\".");
 	}
 
-	std::istream& instream{ Args.inputFile ? infile : std::cin };
+	std::istream& instream{ Options.inputFile ? infile : std::cin };
 
-	if ( Args.decode )
+	if ( Options.decode )
 		Decode(instream);
 	else
-		Encode(instream, Args.wrap);
+		Encode(instream, Options.wrap);
 	
 	return 0;
 }
@@ -170,6 +134,8 @@ Parameters ParseArgs(int argc, char** argv)
 	for ( int i = 1; i < argc; ++i )
 	{
 		input = argv[i];
+		if ( input.empty() )
+			throw std::string{ "WTF? Somehow an empty string snuck in as a command line argument." };
 
 		if ( input == "-d" || input == "--decode" )
 		{
@@ -178,6 +144,14 @@ Parameters ParseArgs(int argc, char** argv)
 		else if ( input == "-v" || input == "--version" )
 		{
 			retval.version = true;
+		}
+		else if ( input == "-z" )
+		{
+			retval.disableZ = true;
+		}
+		else if ( input == "-y" )
+		{
+			retval.disableY = true;
 		}
 		else if ( input == "-h" || input == "--help" || input == "--halp" || input == "-?"
 #ifdef _WIN32
@@ -203,6 +177,13 @@ Parameters ParseArgs(int argc, char** argv)
 			if ( error )
 				throw std::string{ "Couldn't parse the wrap parameter." };
 		}
+		else if ( input == "-a" || input == "--alphabet" )
+		{
+			if ( i + 1 < argc )
+				retval.alphaFile = argv[++i];
+			else
+				throw std::string{ "No file name specified for custom alphabet." };
+		}
 		else if ( input.size() > 0 && input[0] == '-' )
 		{
 			throw (std::string{ "Unknown switch \"" } + input + "\"");
@@ -216,6 +197,45 @@ Parameters ParseArgs(int argc, char** argv)
 	return retval;
 }
 
+void InitAlphabet(Parameters& args)
+{
+	if ( args.alphaFile )
+	{
+		AlphaEnc = AlphaEncMutable;
+		std::ifstream af(args.alphaFile, std::ios::binary);
+		if ( !af.good() )
+				throw (std::string{ "Unable to open alphabet file \"" } + args.alphaFile + "\".");
+		
+		af.read(reinterpret_cast<char*>(AlphaEncMutable), 87);
+		auto bytesRead = af.gcount();
+		if ( bytesRead < 85 )
+			throw std::string{ "Not enough characters in the alphabet file." };
+		if ( bytesRead < 87 )
+			args.disableY = true;
+		if ( bytesRead < 86 )
+			args.disableZ = true;
+	}
+
+	if ( args.decode )
+	{
+		auto setDecoder = [](int index)
+		{
+			if ( AlphaDec[AlphaEnc[index]] == -1 )
+				AlphaDec[AlphaEnc[index]] = index;
+			else
+				throw (std::string{ "Duplicate alphabet entry '" } + char(AlphaEnc[index]) + "'. Not gonna bother trying to decode anything with this." );
+		};
+
+		AlphaDec.fill(-1);
+		for (int i = 0; i < 85; ++i)
+			setDecoder(i);
+		if ( !args.disableZ )
+			setDecoder(85);
+		if ( !args.disableY )
+			setDecoder(86);
+	}
+}
+
 void Encode(std::istream& instream, size_t wrap)
 {
 	size_t charsOnThisLine{ 0 };
@@ -225,7 +245,7 @@ void Encode(std::istream& instream, size_t wrap)
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
 #ifdef _WIN32
-			if ( gBinaryModeGood )
+			if ( BinaryModeGood )
 				std::cout.put('\r');
 #endif
 			std::cout.put('\n');
@@ -245,34 +265,33 @@ void Encode(std::istream& instream, size_t wrap)
 		{
 			uint32_t word = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
 
-			if ( word == 0 )
+			if ( word == 0 && !Options.disableZ )
 			{
-				WrappedPrint('z');
+				WrappedPrint(AlphaEnc[85]);
 				continue;
 			}
 
-			if ( word == 0x20202020 )
+			if ( word == 0x20202020 && !Options.disableY )
 			{
-				WrappedPrint('y');
+				WrappedPrint(AlphaEnc[86]);
 				continue;
 			}
 
 			unsigned char output[5];
-			output[4] = 33u + word % alphabetSize;
+			output[4] = AlphaEnc[word % 85];
 			for ( int j = 3; j >= 0; --j )
 			{
-				word /= alphabetSize;
-				output[j] = 33u + word % alphabetSize;
+				word /= 85;
+				output[j] = AlphaEnc[word % 85];
 			}
 
-			size_t writeThisMany = bytesRead + 1;
-			for ( size_t j = 0; j < writeThisMany; ++j )
+			for ( size_t j = 0; j < bytesRead + 1; ++j )
 				WrappedPrint(output[j]);
 		}
 	}
 
 #ifdef _WIN32
-	if ( gBinaryModeGood )
+	if ( BinaryModeGood )
 		std::cout.put('\r');
 #endif
 	std::cout.put('\n');
@@ -290,7 +309,7 @@ void Decode(std::istream& instream)
 		instream.read(reinterpret_cast<char*>(buffer + leftovers), bufferSize - leftovers);
 		size_t bytesRead = instream.gcount();
 		if ( bytesRead == 0 )
-			continue; // break saattaisi olla oikeampi
+			continue;
 		
 		unsigned char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
 		unsigned char* ptr{ DecodeZY(buffer, end) };
@@ -311,7 +330,7 @@ void Decode(std::istream& instream)
 	if ( leftovers > 0 )
 	{
 		for (size_t i = 0; i < 4; ++i) // pad with the last letter
-			buffer[leftovers + i] = 33u + alphabetSize - 1u;
+			buffer[leftovers + i] = AlphaEnc[84];
 
 		Decode5(buffer, leftovers - 1);
 	}
@@ -321,14 +340,14 @@ void Decode(std::istream& instream)
 
 unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
 {
-	while ( (start != end) && ((*start == 'z') || (*start == 'y') || ((33 <= *start) && (*start < 33 + alphabetSize))) )
+	while ( (start != end) && (AlphaDec[*start] != -1) )
 		++start;
 
 	unsigned char* cursor{ start };
 
 	while ( start != end )
 	{
-		if ( ((33 <= *start) && (*start < 33 + alphabetSize)) || (*start == 'z') || (*start == 'y') )
+		if ( AlphaDec[*start] != -1 )
 			*cursor++ = *start;
 
 		++start;
@@ -347,13 +366,13 @@ unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end)
 	{
 		again = 0;
 
-		if ( *start == 'z' )
+		if ( !Options.disableZ && (*start == AlphaEnc[85]) )
 		{
 			std::cout.write(reinterpret_cast<const char*>(zeros), 4);
 			++start;
 			again = 1;
 		}
-		else if ( *start == 'y' )
+		else if ( !Options.disableY && (*start == AlphaEnc[86]) )
 		{
 			std::cout.write(reinterpret_cast<const char*>(spaces), 4);
 			++start;
@@ -371,10 +390,10 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 	for (size_t i = 0; i < 5; ++i)
 	{
 		unsigned char c{ *buf++ };
-		if ( c == 'z' || c == 'y' )
+		if ( (!Options.disableZ && c == AlphaEnc[85]) || (!Options.disableY && c == AlphaEnc[86]) )
 			throw (std::string{ "Decoding error: Abbreviation '" } + char(c) + "' in the middle of a group.");
 
-		word = word * alphabetSize + c - 33u;
+		word = word * 85 + AlphaDec[c];
 	}
 
 	if ( word > UINT32_MAX )
