@@ -42,10 +42,12 @@ struct Parameters
 	bool version{ false };
 	bool disableZ{ false };
 	bool disableY{ false };
+	bool z85{ false };
 };
 
 static Parameters Options;
 static constexpr unsigned char AlphaEncDefault[]{ R"++(!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuzy)++" };
+static constexpr unsigned char AlphaEncZ85[]{ R"++(0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#)++" };
 static unsigned char AlphaEncMutable[87];
 static const unsigned char* AlphaEnc{ AlphaEncDefault };
 static std::array<int, 256> AlphaDec;
@@ -54,7 +56,7 @@ Parameters ParseArgs(int argc, char** argv);
 void InitAlphabet(Parameters& args);
 void Encode(std::istream& instream, size_t wrap);
 void Decode(std::istream& instream);
-unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end);
+unsigned char* DiscardInvalid(unsigned char* start, unsigned char* const end);
 unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
 void DisplayHelp();
@@ -77,8 +79,7 @@ int main(int argc, char** argv) try
 		return 0;
 	}
 
-	if ( Options.decode || Options.alphaFile )
-		InitAlphabet(Options);
+	InitAlphabet(Options);
 
 	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
 
@@ -153,6 +154,10 @@ Parameters ParseArgs(int argc, char** argv)
 		{
 			retval.disableY = true;
 		}
+		else if ( input == "--z85" )
+		{
+			retval.z85 = true;
+		}
 		else if ( input == "-h" || input == "--help" || input == "--halp" || input == "-?"
 #ifdef _WIN32
 		|| input == "/?"
@@ -199,7 +204,13 @@ Parameters ParseArgs(int argc, char** argv)
 
 void InitAlphabet(Parameters& args)
 {
-	if ( args.alphaFile )
+	if ( args.z85 )
+	{
+		AlphaEnc = AlphaEncZ85;
+		args.disableY = true;
+		args.disableZ = true;
+	}
+	else if ( args.alphaFile )
 	{
 		AlphaEnc = AlphaEncMutable;
 		std::ifstream af(args.alphaFile, std::ios::binary);
@@ -238,9 +249,7 @@ void InitAlphabet(Parameters& args)
 
 void Encode(std::istream& instream, size_t wrap)
 {
-	size_t charsOnThisLine{ 0 };
-
-	auto WrappedPrint = [wrap, &charsOnThisLine](unsigned char c)
+	auto WrappedPrint = [wrap, charsOnThisLine = 0ull](unsigned char c) mutable
 	{
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
@@ -265,13 +274,13 @@ void Encode(std::istream& instream, size_t wrap)
 		{
 			uint32_t word = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
 
-			if ( word == 0 && !Options.disableZ )
+			if ( !Options.disableZ && word == 0 )
 			{
 				WrappedPrint(AlphaEnc[85]);
 				continue;
 			}
 
-			if ( word == 0x20202020 && !Options.disableY )
+			if ( !Options.disableY && word == 0x20202020 )
 			{
 				WrappedPrint(AlphaEnc[86]);
 				continue;
@@ -311,7 +320,7 @@ void Decode(std::istream& instream)
 		if ( bytesRead == 0 )
 			continue;
 		
-		unsigned char* const end{ DiscardInvalids(buffer, buffer + leftovers + bytesRead) };
+		unsigned char* const end{ DiscardInvalid(buffer + leftovers, buffer + leftovers + bytesRead) };
 		unsigned char* ptr{ DecodeZY(buffer, end) };
 
 		while ( ptr + 4 < end)
@@ -338,7 +347,7 @@ void Decode(std::istream& instream)
 	std::cout.flush();
 }
 
-unsigned char* DiscardInvalids(unsigned char* start, unsigned char* const end)
+unsigned char* DiscardInvalid(unsigned char* start, unsigned char* const end)
 {
 	while ( (start != end) && (AlphaDec[*start] != -1) )
 		++start;
@@ -414,14 +423,16 @@ std::cout <<
 "Encode or decode Base85/Ascii85 to stdout from file or stdin.\n\n"
 
 "Switches:\n"
-"  -d, --decode               Hopefully self explanatory.\n"
-"  -w N, --wrap N             Split encoded output into lines N characters long.\n"
-"                             Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
-"  -a FILE, --alphabet FILE   Read custom alphabet from file FILE.\n"
-"  -z                         Disable the 'z' abbreviation for zeros.\n"
-"  -y                         Disable the 'y' abbreviation for spaces.\n"
-"  -?, -h, --help             Display this help.\n"
-"  -v, --version              Version info.\n\n"
+"  -d, --decode              Hopefully self explanatory.\n"
+"  -w N, --wrap N            Split encoded output into lines N characters long.\n"
+"                            Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
+"  -a FILE, --alphabet FILE  Read custom alphabet from file FILE.\n"
+"  -z                        Disable the 'z' abbreviation for zeros.\n"
+"  -y                        Disable the 'y' abbreviation for spaces.\n"
+"  --z85                     Use the Z85 alphabet. Overrides -a. Forces -z -y.\n"
+"                            Ignores the Z85 spec on input and output length.\n"
+"  -?, -h, --help            Display this help.\n"
+"  -v, --version             Version info.\n\n"
 
 "If no input filename is provided then stdin is used for input. During decoding\n"
 "all bytes not in the base85 alphabet will be ignored (i.e. skipped).\n"
