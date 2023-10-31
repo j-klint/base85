@@ -42,6 +42,7 @@ struct Parameters
 	bool disableZ{ false };
 	bool disableY{ false };
 	bool z85{ false };
+	bool ref{ false };
 };
 
 static Parameters Options;
@@ -60,21 +61,36 @@ unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
 void DisplayHelp();
 
+inline void DisplayVersion() { std::cout << "This executable was compiled on " __DATE__ " " __TIME__; }
+inline void DisplayReferences() { std::cout << "https://en.wikipedia.org/wiki/Ascii85\nhttps://rfc.zeromq.org/spec/32/"; }
+
 
 int main(int argc, char** argv) try
 {
-	// Parameters args = ParseArgs(argc, argv);
 	Options = ParseArgs(argc, argv);
 	
 	if ( Options.help )
 	{
 		DisplayHelp();
-		return 0;
+		if ( Options.version || Options.ref )
+			std::cout << "\n\n";
+	}
+
+	if ( Options.ref )
+	{
+		DisplayReferences();
+		if ( Options.version )
+			std::cout << "\n\n";
 	}
 
 	if ( Options.version )
 	{
-		std::cout << "This executable was compiled on " __DATE__ " " __TIME__ "\n";
+		DisplayVersion();
+	}
+
+	if ( Options.help || Options.version || Options.ref )
+	{
+		std::cout << std::endl;
 		return 0;
 	}
 
@@ -105,12 +121,12 @@ int main(int argc, char** argv) try
 	
 	return 0;
 }
-catch ( std::ios_base::failure& f )
+catch ( const std::ios_base::failure& f )
 {
 	std::cerr << "base85: I/O error: " << f.what() << '\n';
 	return 1;
 }
-catch ( std::string& v )
+catch ( const std::string& v )
 {
 	std::cerr << "base85: " << v << '\n';
 	return 1;
@@ -132,12 +148,17 @@ Parameters ParseArgs(int argc, char** argv)
 	std::string input;
 	bool takingOpts{ true };
 
-	auto trySetInputfile = [&retval](char* arg)
+	auto trySetInputfile = [&retval, warned = false](char* arg) mutable
 	{
-		if ( retval.inputFile )
-			throw std::string{ "Too many input files specified." };
-		else
+		if ( !retval.inputFile )
+		{
 			retval.inputFile = arg;
+		}
+		else if ( !warned )
+		{
+			std::cerr << "base85: Several input files specified. Using only the first one.\n";
+			warned = true;
+		}
 	};
 
 	for ( int i = 1; i < argc; ++i )
@@ -171,6 +192,10 @@ Parameters ParseArgs(int argc, char** argv)
 			else if ( input == "--z85" )
 			{
 				retval.z85 = true;
+			}
+			else if ( input == "--ref" )
+			{
+				retval.ref = true;
 			}
 			else if ( input == "-h" || input == "--help" || input == "--halp"
 #ifdef _WIN32
@@ -232,12 +257,12 @@ void InitAlphabet(Parameters& args)
 	else if ( args.alphaFile )
 	{
 		AlphaEnc = AlphaEncCustom;
-		std::ifstream af(args.alphaFile, std::ios::binary);
-		if ( !af.good() )
+		std::ifstream alphfile(args.alphaFile, std::ios::binary);
+		if ( !alphfile.good() )
 				throw (std::string{ "Unable to open alphabet file \"" } + args.alphaFile + "\".");
 		
-		af.read(reinterpret_cast<char*>(AlphaEncCustom), 87);
-		auto bytesRead = af.gcount();
+		alphfile.read(reinterpret_cast<char*>(AlphaEncCustom), 87);
+		auto bytesRead = alphfile.gcount();
 		if ( bytesRead < 85 )
 			throw std::string{ "Not enough characters in the alphabet file." };
 		if ( bytesRead < 87 )
@@ -246,25 +271,30 @@ void InitAlphabet(Parameters& args)
 			args.disableZ = true;
 	}
 
-	if ( args.decode )
+	auto setDecoder = [abort = args.decode](int index)
 	{
-		auto setDecoder = [](int index)
+		if ( AlphaDec[AlphaEnc[index]] == -1 )
 		{
-			if ( AlphaDec[AlphaEnc[index]] == -1 )
-				AlphaDec[AlphaEnc[index]] = index;
+			AlphaDec[AlphaEnc[index]] = index;
+		}
+		else
+		{
+			std::string warning{ (std::string{ "Duplicate alphabet entry '" } + char(AlphaEnc[index]) + "'. Not gonna decode." ) };
+			if ( abort )
+				throw warning;
 			else
-				throw (std::string{ "Duplicate alphabet entry '" } + char(AlphaEnc[index]) + "'. Not gonna bother trying to decode anything with this." );
-		};
+				std::cerr << "base85: " << warning << '\n';
+		}
+	};
 
-		for ( int i = 0; i < 256; ++i )
-			AlphaDec[i] = -1;
-		for ( int i = 0; i < 85; ++i )
-			setDecoder(i);
-		if ( !args.disableZ )
-			setDecoder(85);
-		if ( !args.disableY )
-			setDecoder(86);
-	}
+	for ( int i = 0; i < 256; ++i )
+		AlphaDec[i] = -1;
+	for ( int i = 0; i < 85; ++i )
+		setDecoder(i);
+	if ( !args.disableZ )
+		setDecoder(85);
+	if ( !args.disableY )
+		setDecoder(86);
 }
 
 void Encode(std::istream& instream, size_t wrap)
@@ -440,29 +470,42 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 void DisplayHelp()
 {
 std::cout <<
-"Encode or decode Base85/Ascii85 to stdout from file or stdin.\n\n"
+"To encode or decode Base85/Ascii85 to stdout from a file or stdin.\n\n"
 
-"Switches:\n"
-"  -d, --decode              Hopefully self explanatory.\n"
-"  -w N, --wrap N            Split encoded output into lines N characters long.\n"
-"                            Default " << Parameters{}.wrap << ". Use 0 to disable wrapping.\n"
-"  -a FILE, --alphabet FILE  Read custom alphabet from file FILE.\n"
-"  -z                        Disable the 'z' abbreviation for zeros.\n"
-"  -y                        Disable the 'y' abbreviation for spaces.\n"
-"  --z85                     Use the Z85 alphabet. Overrides -a. Forces -z -y.\n"
-"                            Ignores the Z85 spec on input and output length.\n"
-"  --                        Stop parsing options. All further arguments are\n"
-"                            to be considered file names.\n"
+"Usage: base85 [Option]... [FILENAME] [Option]...\n\n"
+
+"Options:\n"
+"  -d,   --decode  Decode instead of encoding.\n"
+"  -w N, --wrap N  Insert a line break for every N characters of encoded\n"
+"                  output proper. Default " << Parameters{}.wrap <<
+                                           ". Use 0 to disable.\n"
+"  -z              Disable the 'z' abbreviation for groups of zeroes.\n"
+"  -y              Disable the 'y' abbreviation for groups of spaces.\n"
+"                  Note: If either of these have been disabled during encoding,\n"
+"                        decoding will still work with them enabled, too.\n"
+"  --z85           Use the Z85 alphabet. Overrides -a, forces -z -y, but\n"
+"                  ignores the Z85 spec regarding input and output lengths.\n"
+"  --              End of options. All arguments which come after this are\n"
+"                  to be considered file names.\n\n"
+
+"  -a FILE, --alphabet FILE  Read custom alphabet from file FILE. Has to be at\n"
+"                            least 85 bytes long. Bytes 86 and 87, if existant,\n"
+"                            will be used for the 'z' and 'y' abbreviations,\n"
+"                            respectively. If there are duplicate entries,\n"
+"                            then decoding will not be attempted.\n\n"
 #ifdef _WIN32
-"  -?, -h, --help            Display this help.\n"
+"  -?, -h, --help     This help\n"
+"  -v,     --version  Version info\n"
+"          --ref      References\n\n"
 #else
-"  -h, --help                Display this help.\n"
+"  -h, --help     This help\n"
+"  -v, --version  Version info\n"
+"      --ref      References\n\n"
 #endif
-"  -v, --version             Version info.\n\n"
 
-"If no input file name is provided then stdin is used for input. During decoding\n"
-"all bytes not in the base85 alphabet will be ignored (i.e. skipped).\n"
-"If you want your output written to a file then please use the redirection\n"
-"operator \">\" appropriately."
-<< std::endl;
+"If no input FILENAME is provided, then stdin is used for input. If no custom\n"
+"alphabet nor Z85 are specified, the standard one from '!' to 'u' in ASCII\n"
+"order plus 'z' and 'y' will be used. During decoding all bytes not in the\n"
+"alphabet will be ignored (i.e. skipped). If you want the output written to\n"
+"a file, then please use the redirection operator \">\" appropriately.";
 }
