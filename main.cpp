@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <array>
 
 #ifdef _WIN32
 #include <io.h>
@@ -47,10 +46,10 @@ struct Parameters
 
 static Parameters Options;
 static constexpr unsigned char AlphaEncDefault[]{ R"++(!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuzy)++" };
-static constexpr unsigned char AlphaEncZ85[]{ R"++(0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#)++" };
-static unsigned char AlphaEncMutable[87];
+static constexpr unsigned char AlphaEncZ85[]{     R"++(0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#)++" };
+static unsigned char AlphaEncCustom[87];
 static const unsigned char* AlphaEnc{ AlphaEncDefault };
-static std::array<int, 256> AlphaDec;
+static int AlphaDec[256];
 
 Parameters ParseArgs(int argc, char** argv);
 void InitAlphabet(Parameters& args);
@@ -116,12 +115,12 @@ catch ( std::string& v )
 	std::cerr << "base85: " << v << '\n';
 	return 1;
 }
-catch(const std::exception& e)
+catch ( const std::exception& e )
 {
 	std::cerr << "base85: An unanticipated exception occurred: " << e.what() << '\n';
 	return 1;
 }
-catch( ... )
+catch ( ... )
 {
 	std::cerr << "base85: An unknown exception occurred!\n";
 	return 1;
@@ -131,6 +130,15 @@ Parameters ParseArgs(int argc, char** argv)
 {
 	Parameters retval;
 	std::string input;
+	bool takingOpts{ true };
+
+	auto trySetInputfile = [&retval](char* arg)
+	{
+		if ( retval.inputFile )
+			throw std::string{ "Too many input files specified." };
+		else
+			retval.inputFile = arg;
+	};
 
 	for ( int i = 1; i < argc; ++i )
 	{
@@ -138,64 +146,75 @@ Parameters ParseArgs(int argc, char** argv)
 		if ( input.empty() )
 			throw std::string{ "WTF? Somehow an empty string snuck in as a command line argument." };
 
-		if ( input == "-d" || input == "--decode" )
+		if ( takingOpts )
 		{
-			retval.decode = true;
-		}
-		else if ( input == "-v" || input == "--version" )
-		{
-			retval.version = true;
-		}
-		else if ( input == "-z" )
-		{
-			retval.disableZ = true;
-		}
-		else if ( input == "-y" )
-		{
-			retval.disableY = true;
-		}
-		else if ( input == "--z85" )
-		{
-			retval.z85 = true;
-		}
-		else if ( input == "-h" || input == "--help" || input == "--halp" || input == "-?"
-#ifdef _WIN32
-		|| input == "/?"
-#endif
-		) {
-			retval.help = true;
-		}
-		else if ( input == "-w" || input == "--wrap" )
-		{
-			bool error{ argc <= i + 1 };
-			if ( !error )
+			if ( input == "-d" || input == "--decode" )
 			{
-				try
-				{
-					retval.wrap = std::max(0, std::stoi(argv[++i]));
-				}
-				catch(const std::exception&)
-				{
-					error = true;
-				}
+				retval.decode = true;
 			}
-			if ( error )
-				throw std::string{ "Couldn't parse the wrap parameter." };
-		}
-		else if ( input == "-a" || input == "--alphabet" )
-		{
-			if ( i + 1 < argc )
-				retval.alphaFile = argv[++i];
+			else if ( input == "-v" || input == "--version" )
+			{
+				retval.version = true;
+			}
+			else if ( input == "--" )
+			{
+				takingOpts = false;
+			}
+			else if ( input == "-z" )
+			{
+				retval.disableZ = true;
+			}
+			else if ( input == "-y" )
+			{
+				retval.disableY = true;
+			}
+			else if ( input == "--z85" )
+			{
+				retval.z85 = true;
+			}
+			else if ( input == "-h" || input == "--help" || input == "--halp"
+#ifdef _WIN32
+			|| input == "/?" || input == "-?"
+#endif
+			) {
+				retval.help = true;
+			}
+			else if ( input == "-w" || input == "--wrap" )
+			{
+				bool error{ argc <= i + 1 };
+				if ( !error )
+				{
+					try
+					{
+						retval.wrap = std::max(0, std::stoi(argv[++i]));
+					}
+					catch ( const std::exception& )
+					{
+						error = true;
+					}
+				}
+				if ( error )
+					throw std::string{ "Couldn't parse the wrap parameter." };
+			}
+			else if ( input == "-a" || input == "--alphabet" )
+			{
+				if ( i + 1 < argc )
+					retval.alphaFile = argv[++i];
+				else
+					throw std::string{ "No file name specified for custom alphabet." };
+			}
+			else if ( input.size() > 0 && input[0] == '-' )
+			{
+				throw (std::string{ "Unknown switch \"" } + input + "\"");
+			}
 			else
-				throw std::string{ "No file name specified for custom alphabet." };
-		}
-		else if ( input.size() > 0 && input[0] == '-' )
-		{
-			throw (std::string{ "Unknown switch \"" } + input + "\"");
+			{
+				trySetInputfile(argv[i]);
+			}
 		}
 		else
 		{
-			retval.inputFile = argv[i];
+			trySetInputfile(argv[i]);
 		}
 	}
 
@@ -212,12 +231,12 @@ void InitAlphabet(Parameters& args)
 	}
 	else if ( args.alphaFile )
 	{
-		AlphaEnc = AlphaEncMutable;
+		AlphaEnc = AlphaEncCustom;
 		std::ifstream af(args.alphaFile, std::ios::binary);
 		if ( !af.good() )
 				throw (std::string{ "Unable to open alphabet file \"" } + args.alphaFile + "\".");
 		
-		af.read(reinterpret_cast<char*>(AlphaEncMutable), 87);
+		af.read(reinterpret_cast<char*>(AlphaEncCustom), 87);
 		auto bytesRead = af.gcount();
 		if ( bytesRead < 85 )
 			throw std::string{ "Not enough characters in the alphabet file." };
@@ -237,8 +256,9 @@ void InitAlphabet(Parameters& args)
 				throw (std::string{ "Duplicate alphabet entry '" } + char(AlphaEnc[index]) + "'. Not gonna bother trying to decode anything with this." );
 		};
 
-		AlphaDec.fill(-1);
-		for (int i = 0; i < 85; ++i)
+		for ( int i = 0; i < 256; ++i )
+			AlphaDec[i] = -1;
+		for ( int i = 0; i < 85; ++i )
 			setDecoder(i);
 		if ( !args.disableZ )
 			setDecoder(85);
@@ -431,10 +451,16 @@ std::cout <<
 "  -y                        Disable the 'y' abbreviation for spaces.\n"
 "  --z85                     Use the Z85 alphabet. Overrides -a. Forces -z -y.\n"
 "                            Ignores the Z85 spec on input and output length.\n"
+"  --                        Stop parsing options. All further arguments are\n"
+"                            to be considered file names.\n"
+#ifdef _WIN32
 "  -?, -h, --help            Display this help.\n"
+#else
+"  -h, --help                Display this help.\n"
+#endif
 "  -v, --version             Version info.\n\n"
 
-"If no input filename is provided then stdin is used for input. During decoding\n"
+"If no input file name is provided then stdin is used for input. During decoding\n"
 "all bytes not in the base85 alphabet will be ignored (i.e. skipped).\n"
 "If you want your output written to a file then please use the redirection\n"
 "operator \">\" appropriately."
