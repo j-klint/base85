@@ -62,7 +62,11 @@ unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
 void DisplayHelp();
 
 inline void DisplayVersion() { std::cout << "This executable was compiled on " __DATE__ " " __TIME__; }
-inline void DisplayReferences() { std::cout << "https://en.wikipedia.org/wiki/Ascii85\nhttps://rfc.zeromq.org/spec/32/"; }
+inline void DisplayReferences()
+{
+	std::cout << "The standard Base85: https://en.wikipedia.org/wiki/Ascii85\n"
+	             "The Z85 version:     https://rfc.zeromq.org/spec/32/";
+}
 
 
 int main(int argc, char** argv) try
@@ -109,7 +113,7 @@ int main(int argc, char** argv) try
 	{
 		infile.open(Options.inputFile, std::ios::binary);
 		if ( !infile.good() )
-			throw (std::string{ "Unable to open input file \"" } + Options.inputFile + "\".");
+			throw (std::string{ "Unable to open input file \"" } + Options.inputFile + "\"");
 	}
 
 	std::istream& instream{ Options.inputFile ? infile : std::cin };
@@ -259,12 +263,12 @@ void InitAlphabet(Parameters& args)
 		AlphaEnc = AlphaEncCustom;
 		std::ifstream alphfile(args.alphaFile, std::ios::binary);
 		if ( !alphfile.good() )
-				throw (std::string{ "Unable to open alphabet file \"" } + args.alphaFile + "\".");
+				throw (std::string{ "Unable to open alphabet file \"" } + args.alphaFile + "\"");
 		
 		alphfile.read(reinterpret_cast<char*>(AlphaEncCustom), 87);
 		auto bytesRead = alphfile.gcount();
 		if ( bytesRead < 85 )
-			throw std::string{ "Not enough characters in the alphabet file." };
+			throw std::string{ "Not enough characters in the alphabet file" };
 		if ( bytesRead < 87 )
 			args.disableY = true;
 		if ( bytesRead < 86 )
@@ -450,13 +454,13 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 	{
 		unsigned char c{ *buf++ };
 		if ( (!Options.disableZ && c == AlphaEnc[85]) || (!Options.disableY && c == AlphaEnc[86]) )
-			throw (std::string{ "Decoding error: Abbreviation '" } + char(c) + "' in the middle of a group.");
+			throw (std::string{ "Decoding error: Abbreviation '" } + char(c) + "' in the middle of a group");
 
 		word = word * 85 + AlphaDec[c];
 	}
 
 	if ( word > UINT32_MAX )
-		throw std::string{ "Decoding error: Over-big group." };
+		throw std::string{ "Decoding error: Over-big group" };
 
 	for ( size_t i = 0; i < amount; ++i )
 	{
@@ -481,8 +485,6 @@ std::cout <<
                                            ". Use 0 to disable.\n"
 "  -z              Disable the 'z' abbreviation for groups of zeroes.\n"
 "  -y              Disable the 'y' abbreviation for groups of spaces.\n"
-"                  Note: If either of these have been disabled during encoding,\n"
-"                        decoding will still work with them enabled, too.\n"
 "  --z85           Use the Z85 alphabet. Overrides -a, forces -z -y, but\n"
 "                  ignores the Z85 spec regarding input and output lengths.\n"
 "  --              End of options. All arguments which come after this are\n"
@@ -494,13 +496,13 @@ std::cout <<
 "                            respectively. If there are duplicate entries,\n"
 "                            then decoding will not be attempted.\n\n"
 #ifdef _WIN32
-"  -?, -h, --help     This help\n"
-"  -v,     --version  Version info\n"
-"          --ref      References\n\n"
+"  -?, -h, --help     Display this help.\n"
+"          --ref      Display references.\n"
+"  -v,     --version  Display version info.\n\n"
 #else
-"  -h, --help     This help\n"
-"  -v, --version  Version info\n"
-"      --ref      References\n\n"
+"  -h, --help     Display this help.\n"
+"      --ref      Display references.\n"
+"  -v, --version  Display version info.\n\n"
 #endif
 
 "If no input FILENAME is provided, then stdin is used for input. If no custom\n"
