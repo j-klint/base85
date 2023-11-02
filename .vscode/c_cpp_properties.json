@@ -7,6 +7,7 @@
             ],
             "defines": [
                 //"_DEBUG",
+                "NDEBUG",
                 "UNICODE",
                 "_UNICODE"
             ],
@@ -21,10 +22,12 @@
             "includePath": [
                 "${workspaceFolder}/**"
             ],
-            "defines": [],
+            "defines": [
+                "NDEBUG"
+            ],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
-            "cppStandard": "gnu++17",
+            "cppStandard": "c++17",
             "intelliSenseMode": "linux-gcc-x64"
         }
     ],

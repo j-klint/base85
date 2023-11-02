@@ -60,13 +60,8 @@ unsigned char* DiscardInvalid(unsigned char* start, unsigned char* const end);
 unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
 void DisplayHelp();
-
-inline void DisplayVersion() { std::cout << "This executable was compiled on " __DATE__ " " __TIME__; }
-inline void DisplayReferences()
-{
-	std::cout << "The standard Base85: https://en.wikipedia.org/wiki/Ascii85\n"
-	             "The Z85 version:     https://rfc.zeromq.org/spec/32/";
-}
+void DisplayVersion();
+void DisplayReferences();
 
 
 int main(int argc, char** argv) try
@@ -77,26 +72,21 @@ int main(int argc, char** argv) try
 	{
 		DisplayHelp();
 		if ( Options.version || Options.ref )
-			std::cout << "\n\n";
+			std::cout << "\n";
 	}
 
 	if ( Options.ref )
 	{
 		DisplayReferences();
 		if ( Options.version )
-			std::cout << "\n\n";
+			std::cout << "\n";
 	}
 
 	if ( Options.version )
-	{
 		DisplayVersion();
-	}
 
 	if ( Options.help || Options.version || Options.ref )
-	{
-		std::cout << std::endl;
 		return 0;
-	}
 
 	InitAlphabet(Options);
 
@@ -471,12 +461,27 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 	return buf;
 }
 
+void DisplayVersion()
+{
+	std::cout << "This "
+#ifdef _WIN32
+	"Windows "
+#elif defined __linux || defined __linux__
+	"Linux "
+#endif
+	"executable was compiled on " __DATE__ " " __TIME__ << std::endl;
+}
+
+void DisplayReferences()
+{
+	std::cout << "Wikipedia's Base85: https://en.wikipedia.org/wiki/Ascii85\n"
+	             "The Z85 version:    https://rfc.zeromq.org/spec/32/" << std::endl;
+}
+
 void DisplayHelp()
 {
 std::cout <<
 "To encode or decode Base85/Ascii85 to stdout from a file or stdin.\n\n"
-
-"Usage: base85 [Option]... [FILENAME] [Option]...\n\n"
 
 "Options:\n"
 "  -d,   --decode  Decode instead of encoding.\n"
@@ -485,16 +490,16 @@ std::cout <<
                                            ". Use 0 to disable.\n"
 "  -z              Disable the 'z' abbreviation for groups of zeroes.\n"
 "  -y              Disable the 'y' abbreviation for groups of spaces.\n"
-"  --z85           Use the Z85 alphabet. Overrides -a, forces -z -y, but\n"
+"        --z85     Use the Z85 alphabet. Overrides -a, forces -z -y, but\n"
 "                  ignores the Z85 spec regarding input and output lengths.\n"
-"  --              End of options. All arguments which come after this are\n"
+"        --        End of options. All arguments which come after this are\n"
 "                  to be considered file names.\n\n"
 
 "  -a FILE, --alphabet FILE  Read custom alphabet from file FILE. Has to be at\n"
 "                            least 85 bytes long. Bytes 86 and 87, if existant,\n"
 "                            will be used for the 'z' and 'y' abbreviations,\n"
-"                            respectively. If there are duplicate entries,\n"
-"                            then decoding will not be attempted.\n\n"
+"                            respectively. If there are duplicate entries, then\n"
+"                            decoding will not be attempted.\n\n"
 #ifdef _WIN32
 "  -?, -h, --help     Display this help.\n"
 "          --ref      Display references.\n"
@@ -505,9 +510,10 @@ std::cout <<
 "  -v, --version  Display version info.\n\n"
 #endif
 
-"If no input FILENAME is provided, then stdin is used for input. If no custom\n"
-"alphabet nor Z85 are specified, the standard one from '!' to 'u' in ASCII\n"
-"order plus 'z' and 'y' will be used. During decoding all bytes not in the\n"
-"alphabet will be ignored (i.e. skipped). If you want the output written to\n"
-"a file, then please use the redirection operator \">\" appropriately.";
+"If no input file is provided, then stdin is used for input. If neither custom\n"
+"alphabet nor Z85 are specified, the usual one from '!' to 'u' in ASCII order\n"
+"plus 'z' and 'y' will be used. During decoding all bytes not in the alphabet\n"
+"will be ignored (i.e. skipped). If you want the output written to a file, then\n"
+"please use the redirection operator \">\" appropriately."
+<< std::endl;
 }
