@@ -59,38 +59,31 @@ void Decode(std::istream& instream);
 unsigned char* DiscardInvalid(unsigned char* start, unsigned char* const end);
 unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
-void DisplayHelp();
-void DisplayVersion();
-void DisplayReferences();
+bool DisplayHelp();
+bool DisplayVersion();
+bool DisplayReferences();
 
 
 int main(int argc, char** argv) try
 {
 	Options = ParseArgs(argc, argv);
+	bool quitAfterMessages{ false };
 	
 	if ( Options.help )
-	{
-		DisplayHelp();
-		if ( Options.version || Options.ref )
-			std::cout << "\n";
-	}
+		quitAfterMessages = DisplayHelp() || true;
 
 	if ( Options.ref )
-	{
-		DisplayReferences();
-		if ( Options.version )
-			std::cout << "\n";
-	}
+		quitAfterMessages = DisplayReferences() || true;
 
 	if ( Options.version )
-		DisplayVersion();
+		quitAfterMessages = DisplayVersion() || true;
 
-	if ( Options.help || Options.version || Options.ref )
+	if ( quitAfterMessages )
 		return 0;
 
-	InitAlphabet(Options);
-
 	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
+
+	InitAlphabet(Options);
 
 #ifdef _WIN32
 	BinaryMode engage;
@@ -318,7 +311,7 @@ void Encode(std::istream& instream, size_t wrap)
 		{
 			uint32_t word = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
 
-			if ( !Options.disableZ && word == 0 )
+			if ( !Options.disableZ && word == 0 && bytesRead == 4 )
 			{
 				WrappedPrint(AlphaEnc[85]);
 				continue;
@@ -375,14 +368,14 @@ void Decode(std::istream& instream)
 
 		// copy leftovers to start of buffer
 		leftovers = end - ptr;
-		for (int i = 0; i < leftovers; ++i)
+		for ( int i = 0; i < leftovers; ++i )
 			buffer[i] = ptr[i];
 	}
 
 	// Deal with leftovers
 	if ( leftovers > 0 )
 	{
-		for (size_t i = 0; i < 4; ++i) // pad with the last letter
+		for ( size_t i = 0; i < 4; ++i ) // pad with the last letter
 			buffer[leftovers + i] = AlphaEnc[84];
 
 		Decode5(buffer, leftovers - 1);
@@ -411,7 +404,7 @@ unsigned char* DiscardInvalid(unsigned char* start, unsigned char* const end)
 
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end)
 {
-	static constexpr unsigned char zeros[4]{0,0,0,0};
+	static constexpr unsigned char zeroes[4]{0,0,0,0};
 	static constexpr unsigned char spaces[4]{0x20,0x20,0x20,0x20};
 	
 	bool again{ 1 };
@@ -421,7 +414,7 @@ unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end)
 
 		if ( !Options.disableZ && (*start == AlphaEnc[85]) )
 		{
-			std::cout.write(reinterpret_cast<const char*>(zeros), 4);
+			std::cout.write(reinterpret_cast<const char*>(zeroes), 4);
 			++start;
 			again = 1;
 		}
@@ -440,7 +433,7 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 {
 	uint64_t word{ 0 };
 	
-	for (size_t i = 0; i < 5; ++i)
+	for ( size_t i = 0; i < 5; ++i )
 	{
 		unsigned char c{ *buf++ };
 		if ( (!Options.disableZ && c == AlphaEnc[85]) || (!Options.disableY && c == AlphaEnc[86]) )
@@ -461,7 +454,7 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 	return buf;
 }
 
-void DisplayVersion()
+bool DisplayVersion()
 {
 	std::cout << "This "
 #ifdef _WIN32
@@ -470,17 +463,19 @@ void DisplayVersion()
 	"Linux "
 #endif
 	"executable was compiled on " __DATE__ " " __TIME__ << std::endl;
+	return true;
 }
 
-void DisplayReferences()
+bool DisplayReferences()
 {
 	std::cout << "Wikipedia's Base85: https://en.wikipedia.org/wiki/Ascii85\n"
 	             "The Z85 version:    https://rfc.zeromq.org/spec/32/" << std::endl;
+	return true;
 }
 
-void DisplayHelp()
+bool DisplayHelp()
 {
-std::cout <<
+	std::cout <<
 "To encode or decode Base85/Ascii85 to stdout from a file or stdin.\n\n"
 
 "Options:\n"
@@ -515,5 +510,6 @@ std::cout <<
 "plus 'z' and 'y' will be used. During decoding all bytes not in the alphabet\n"
 "will be ignored (i.e. skipped). If you want the output written to a file, then\n"
 "please use the redirection operator \">\" appropriately."
-<< std::endl;
+	<< std::endl;
+	return true;
 }

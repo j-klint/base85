@@ -1,4 +1,4 @@
 #!/bin/bash
 if [[ ! -a built ]]; then mkdir built; fi
 cd built
-g++ -O3 -std=c++17 -fno-rtti -Wall -Wextra -Wpedantic -D NDEBUG -o ./base85 $(realpath ..)/*.cpp
+g++ -std=c++17 -fno-rtti -O3 -D NDEBUG -Wall -Wextra -Wpedantic -o ./base85 $(realpath ..)/*.cpp
