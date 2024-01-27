@@ -28,7 +28,7 @@ struct BinaryMode
 	}
 };
 
-static bool BinaryModeGood;
+static bool BinaryModeIsSet{ false };
 #endif // _WIN32
 
 struct Parameters
@@ -66,6 +66,8 @@ bool DisplayReferences();
 
 int main(int argc, char** argv) try
 {
+	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
+
 	Options = ParseArgs(argc, argv);
 	bool quitAfterMessages{ false };
 	
@@ -81,13 +83,11 @@ int main(int argc, char** argv) try
 	if ( quitAfterMessages )
 		return 0;
 
-	std::ios::sync_with_stdio(false); // toivotaan, että tämä nopeuttaa aiheuttamatta haittaa
-
 	InitAlphabet(Options);
 
 #ifdef _WIN32
 	BinaryMode engage;
-	BinaryModeGood = engage.oldout != -1;
+	BinaryModeIsSet = engage.oldout != -1;
 #endif
 	
 	std::ifstream infile;
@@ -291,7 +291,7 @@ void Encode(std::istream& instream, size_t wrap)
 		if ( (wrap != 0) && (charsOnThisLine == wrap) )
 		{
 #ifdef _WIN32
-			if ( BinaryModeGood )
+			if ( BinaryModeIsSet )
 				std::cout.put('\r');
 #endif
 			std::cout.put('\n');
@@ -337,7 +337,7 @@ void Encode(std::istream& instream, size_t wrap)
 	}
 
 #ifdef _WIN32
-	if ( BinaryModeGood )
+	if ( BinaryModeIsSet )
 		std::cout.put('\r');
 #endif
 	std::cout.put('\n');
