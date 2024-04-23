@@ -2,6 +2,23 @@
 #include <fstream>
 #include <string>
 
+struct Parameters
+{
+	char* inputFile{ nullptr };
+	char* alphaFile{ nullptr };
+	int wrap{ 75 };
+	bool decode{ false };
+	bool help{ false };
+	bool version{ false };
+	bool disableZ{ false };
+	bool disableY{ false };
+	bool z85{ false };
+	bool ref{ false };
+	bool quiet { false };
+};
+
+static Parameters Options;
+
 #ifdef _WIN32
 #include <io.h>
 #include <fcntl.h>
@@ -15,9 +32,9 @@ struct BinaryMode
 		oldout = _setmode(_fileno(stdout), _O_BINARY);
 		oldin = _setmode(_fileno(stdin), _O_BINARY);
 
-		if ( oldout == -1 )
+		if ( oldout == -1 && !Options.quiet )
 			std::cerr << "base85: Failed to set stdout to binary mode.\n";
-		if ( oldin == -1 )
+		if ( oldin == -1 && !Options.quiet )
 			std::cerr << "base85: Failed to set stdin to binary mode.\n";
 	}
 
@@ -31,21 +48,6 @@ struct BinaryMode
 static bool BinaryModeIsSet{ false };
 #endif // _WIN32
 
-struct Parameters
-{
-	char* inputFile{ nullptr };
-	char* alphaFile{ nullptr };
-	int wrap{ 75 };
-	bool decode{ false };
-	bool help{ false };
-	bool version{ false };
-	bool disableZ{ false };
-	bool disableY{ false };
-	bool z85{ false };
-	bool ref{ false };
-};
-
-static Parameters Options;
 static constexpr unsigned char AlphaEncDefault[]{ R"++(!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuzy)++" };
 static constexpr unsigned char AlphaEncZ85[]{     R"++(0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#)++" };
 static unsigned char AlphaEncCustom[87];
@@ -141,9 +143,10 @@ Parameters ParseArgs(int argc, char** argv)
 		{
 			retval.inputFile = arg;
 		}
-		else if ( !warned )
+		else if ( !warned && !retval.quiet )
 		{
-			std::cerr << "base85: Several input files specified. Using only the first one.\n";
+			std::cerr << "base85: Several input files specified. Using only the first one: \""
+				<< retval.inputFile << "\"\n";
 			warned = true;
 		}
 	};
@@ -163,6 +166,10 @@ Parameters ParseArgs(int argc, char** argv)
 			else if ( input == "-v" || input == "--version" )
 			{
 				retval.version = true;
+			}
+			else if ( input == "-q" || input == "--quiet" )
+			{
+				retval.quiet = true;
 			}
 			else if ( input == "--" )
 			{
@@ -184,7 +191,7 @@ Parameters ParseArgs(int argc, char** argv)
 			{
 				retval.ref = true;
 			}
-			else if ( input == "-h" || input == "--help" || input == "--halp"
+			else if ( input == "-h" || input == "--help" || input == "--hlep"
 #ifdef _WIN32
 			|| input == "/?" || input == "-?"
 #endif
@@ -269,7 +276,7 @@ void InitAlphabet(Parameters& args)
 			std::string warning{ (std::string{ "Duplicate alphabet entry '" } + char(AlphaEnc[index]) + "'. Not gonna decode." ) };
 			if ( abort )
 				throw warning;
-			else
+			else if ( !Options.quiet )
 				std::cerr << "base85: " << warning << '\n';
 		}
 	};
@@ -483,18 +490,20 @@ bool DisplayHelp()
 "  -w N, --wrap N  Insert a line break for every N characters of encoded\n"
 "                  output proper. Default " << Parameters{}.wrap <<
                                            ". Use 0 to disable.\n"
+"  -q,   --quiet   Suppress warnings.\n"
 "  -z              Disable the 'z' abbreviation for groups of zeroes.\n"
 "  -y              Disable the 'y' abbreviation for groups of spaces.\n"
 "        --z85     Use the Z85 alphabet. Overrides -a, forces -z -y, but\n"
 "                  ignores the Z85 spec regarding input and output lengths.\n"
 "        --        End of options. All arguments which come after this are\n"
-"                  to be considered file names.\n\n"
+"                  to be considered input file names.\n\n"
 
-"  -a FILE, --alphabet FILE  Read custom alphabet from file FILE. Has to be at\n"
-"                            least 85 bytes long. Bytes 86 and 87, if existant,\n"
-"                            will be used for the 'z' and 'y' abbreviations,\n"
-"                            respectively. If there are duplicate entries, then\n"
-"                            decoding will not be attempted.\n\n"
+"  -a FILE, --alphabet FILE  Read custom alphabet from file FILE. Has to be\n"
+"                            at least 85 bytes long. Bytes 86 and 87, if\n"
+"                            existant, will be used for the 'z' and 'y'\n"
+"                            abbreviations, respectively. If there are\n"
+"                            duplicate entries, then decoding will not be\n"
+"                            attempted.\n\n"
 #ifdef _WIN32
 "  -?, -h, --help     Display this help.\n"
 "          --ref      Display references.\n"
@@ -508,8 +517,8 @@ bool DisplayHelp()
 "If no input file is provided, then stdin is used for input. If neither custom\n"
 "alphabet nor Z85 are specified, the usual one from '!' to 'u' in ASCII order\n"
 "plus 'z' and 'y' will be used. During decoding all bytes not in the alphabet\n"
-"will be ignored (i.e. skipped). If you want the output written to a file, then\n"
-"please use the redirection operator \">\" appropriately."
+"will be ignored (i.e. skipped). If you want the output written to a file,\n"
+"then please use the redirection operator \">\" appropriately."
 	<< std::endl;
 	return true;
 }

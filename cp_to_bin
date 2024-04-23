@@ -1,0 +1,1 @@
+cp -v built/base85 ~/bin/
