@@ -37,7 +37,7 @@
         },
 
         "linux": {
-            "label": "C/C++: g++ compile teh programm",
+            "label": "C/C++: g++ compile the program",
             // "type": "shell",
             // "shell": "/bin/bash",
             "type": "process",

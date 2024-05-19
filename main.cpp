@@ -265,7 +265,7 @@ void InitAlphabet(Parameters& args)
 			args.disableZ = true;
 	}
 
-	auto setDecoder = [abort = args.decode](int index)
+	auto setDecoder = [&args](int index)
 	{
 		if ( AlphaDec[AlphaEnc[index]] == -1 )
 		{
@@ -274,9 +274,9 @@ void InitAlphabet(Parameters& args)
 		else
 		{
 			std::string warning{ (std::string{ "Duplicate alphabet entry '" } + char(AlphaEnc[index]) + "'. Not gonna decode." ) };
-			if ( abort )
+			if ( args.decode ) // give up when faced with bullshit decode
 				throw warning;
-			else if ( !Options.quiet )
+			else if ( !args.quiet ) // otherwise only maybe warn
 				std::cerr << "base85: " << warning << '\n';
 		}
 	};
