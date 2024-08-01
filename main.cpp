@@ -62,9 +62,9 @@ void Decode(std::istream& instream);
 unsigned char* DiscardInvalid(unsigned char* start, unsigned char* const end);
 unsigned char* Decode5(unsigned char* buf, size_t amount = 4);
 unsigned char* DecodeZY(unsigned char* start, const unsigned char* const end);
-bool DisplayHelp();
-bool DisplayVersion();
-bool DisplayReferences();
+bool DisplayHelp(bool precedeByNewline);
+bool DisplayVersion(bool precedeByNewline);
+bool DisplayReferences(bool precedeByNewline);
 
 
 int main(int argc, char** argv) try
@@ -75,13 +75,13 @@ int main(int argc, char** argv) try
 	bool quitAfterMessages{ false };
 	
 	if ( Options.help )
-		quitAfterMessages = DisplayHelp() || true;
+		quitAfterMessages = DisplayHelp(quitAfterMessages) || true;
 
 	if ( Options.ref )
-		quitAfterMessages = DisplayReferences() || true;
+		quitAfterMessages = DisplayReferences(quitAfterMessages) || true;
 
 	if ( Options.version )
-		quitAfterMessages = DisplayVersion() || true;
+		quitAfterMessages = DisplayVersion(quitAfterMessages) || true;
 
 	if ( quitAfterMessages )
 		return 0;
@@ -462,8 +462,10 @@ unsigned char* Decode5(unsigned char* buf, size_t amount)
 	return buf;
 }
 
-bool DisplayVersion()
+bool DisplayVersion(bool precedeByNewline)
 {
+	if ( precedeByNewline ) std::cout << '\n';
+
 	std::cout << "This "
 #ifdef _WIN32
 	"Windows "
@@ -474,15 +476,19 @@ bool DisplayVersion()
 	return true;
 }
 
-bool DisplayReferences()
+bool DisplayReferences(bool precedeByNewline)
 {
+	if ( precedeByNewline ) std::cout << '\n';
+
 	std::cout << "Wikipedia's Base85: https://en.wikipedia.org/wiki/Ascii85\n"
 	             "The Z85 version:    https://rfc.zeromq.org/spec/32/" << std::endl;
 	return true;
 }
 
-bool DisplayHelp()
+bool DisplayHelp(bool precedeByNewline)
 {
+	if ( precedeByNewline ) std::cout << '\n';
+
 	std::cout <<
 "To encode or decode Base85/Ascii85 to stdout from a file or stdin.\n\n"
 
