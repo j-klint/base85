@@ -223,10 +223,6 @@ Parameters ParseArgs(int argc, char** argv)
 				else
 					throw std::string{ "No file name specified for custom alphabet." };
 			}
-			else if ( input.size() > 0 && input[0] == '-' )
-			{
-				throw (std::string{ "Unknown switch \"" } + input + "\"");
-			}
 			else
 			{
 				trySetInputfile(argv[i]);
