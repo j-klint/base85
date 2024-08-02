@@ -3,8 +3,8 @@
 
 ## Pikainen käyttelyohje
 
-Samat ohjeet, kuin mitkä itse ohjelma antaa komennolla
-`base85 --help --ref --version`:
+Samat ohjeet kuin mitkä itse ohjelma antaa komennolla
+`base85 --help --ref`:
 
 ```
 To encode or decode Base85/Ascii85 to stdout from a file or stdin.
@@ -40,13 +40,11 @@ then please use the redirection operator ">" appropriately.
 
 Wikipedia's Base85: https://en.wikipedia.org/wiki/Ascii85
 The Z85 version:    https://rfc.zeromq.org/spec/32/
-
-This Linux executable was compiled on Aug  1 2024 18:14:07
 ```
 
-Kaikki, mikä ei ole switchiä/öpšööniä, oletetaan olevan input-tiedoston nimi.
-Vaikka niitä periaatteessa voikin syöttää monta, vain yksi hyväksytään, sillä
-mielestäni ei ole kovinkaan ilmeistä, mitä pitäisi tehdä monen tiedoston
+Kaiken, mikä ei ole switchiä/opšöniä, oletetaan olevan input-tiedoston nimi.
+Vaikka niitä periaatteessa voikin syöttää monta, vain yksi niistä hyväksytään,
+sillä mielestäni ei ole kovinkaan ilmeistä, mitä pitäisi tehdä monen tiedoston
 tapauksessa.
 
 Ja sitten tuo `--`-switch on lähinnä sitä varten, että jos joku pervo on
@@ -55,7 +53,7 @@ nimi, niin eipähän tarvi sitä murehtia (toivottavasti).
 
 Koska tietääkseni Markdownissa ei voi code blockin sisälle laittaa
 hyperlinkkejä, niin tässä vielä klikattavat versiot noista kahdesta linkistä:
-<br>
+
 Wikipedia's Base85: <https://en.wikipedia.org/wiki/Ascii85><br>
 The Z85 version:    <https://rfc.zeromq.org/spec/32/><br>
 
@@ -72,16 +70,14 @@ uudelleenohjausoperaattoreita `>` ja `>>`.
 
 Sattumalta lisäksi törmäsin Juutuubissa [yli 40 vuotta vanhaan
 dokumentaariin](https://www.youtube.com/watch?v=tc4ROCJYbm0), jossa esiintyy
-itse Brian Kernighan ripoteltuna sinne tänne ohjelmaa selittämässä juuri
-näitä asioita.
+itse Brian Kernighan ripoteltuna sinne tänne pitkin videota selittämässä
+juuri näitä asioita.
 
 Ajattelin, että minäkin haluan tehdä tuollaisen. No, tässä nyt on vähän
 sellainen tekele.
 
-On laiskasti testailtu Windows 11:ssä ja (K)ubuntu 22 LTS:ssä, ja todettu
-molemmissa toimivaksi.
-
-
+On laiskasti testailtu Windows 11:ssä ja (K)ubuntu 22 LTS:ssä, ja
+kummassakin vaikuttaisi toimivan.
 
 Joo, jälkikäteen huomasin, että kyllähän `basenc` optiolla `--z85`
 piiputettuna `tr`:ään ja `sed`:iin ajaisi melkein saman asian, mutta se
@@ -89,9 +85,7 @@ vaatisi vielä lisäksi ylimääräisiä pädding-kikkailuja, koska standardi-Z8
 kelpuuttaa vain inputteja, joiden pituus on jaollinen 4:llä tai 5:llä,
 riippuen siitä, koodataanko vai dekoodataanko.
 
-
-
-Valitettavasti yhden kirjaimen öpšööneiden yhdistämistä en vaivautunut
+Valitettavasti yhden kirjaimen opšönien yhdistämistä en vaivautunut
 toteuttamaan, koska siinä vaiheessahan olisin jo melkein tehnyt oman version
 `getopt`:ista.
 
@@ -101,11 +95,12 @@ toteuttamaan, koska siinä vaiheessahan olisin jo melkein tehnyt oman version
 Tämä on vielä niin pieni ohjelma, että sulloin sitten kaiken tuohon yhteen ja
 ainoaan `main.cpp`-tiedostoon.
 
-Jos on VSCoden ja C/C++-lisäkkeen lisäksi asennettuna kääntäjä sopivasti
-(Windowsissa `cl.exe` ja Linuxissa `g++`, ja kaikki polut sun muut oikein),
+Jos on VSCoden ja C/C++-lisäkkeen lisäksi [kääntäjä asennettuna
+sopivasti](https://code.visualstudio.com/docs/cpp/config-msvc)
+(Windowsissa `cl.exe` ja Linuxissa `g++`) ja kaikki polut sun muut oikein,
 niin pitäisi kääntyä VSCodessa pelkällä `Tasks: Run Build Task`-komennolla
 (`Ctrl+Shift+B`). Tämä "Task" luo alihakemistoon `built` tiedoston `base85`
-(Linuxissa) tai `base85.exe` (Windowksessa), jos kaikki menee suunnitelman
+(Linuxissa) tai `base85.exe` (Windowsissa), jos kaikki menee suunnitelman
 mukaan.
 
 Jos ei onnaa, niin kuten sanottua, tässä on vain yksi tiedosto, joten
